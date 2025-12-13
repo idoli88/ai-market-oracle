@@ -34,13 +34,37 @@ nano .env
 ```
 Fill in:
 - `OPENAI_API_KEY`
-- `CALLMEBOT_PHONE`
 - `CALLMEBOT_API_KEY`
 
 ### 4. How to get CallMeBot API Key
 1. Add the phone number `+34 644 10 55 84` to your Phone Contacts. (Name it "CallMeBot")
 2. Send this message: `I allow callmebot to send me messages` to the new contact created.
 3. Wait until you receive the message "API Activated for your phone number. Your APIKEY is 123123"
+
+## Managing Subscribers
+Since this is a multi-tenant system, you need to add phone numbers manually to the database.
+
+### Add a Subscriber
+```bash
+# Add a number for 30 days
+python manage_users.py add +972501234567 --days 30
+```
+
+### List Subscribers
+```bash
+python manage_users.py list
+```
+
+### Remove a Subscriber
+```bash
+python manage_users.py remove +972501234567
+```
+
+### Docker Usage
+If running in Docker, you can manage users inside the container:
+```bash
+docker exec -it ai_market_oracle python manage_users.py add +972501234567
+```
 
 ## Usage
 

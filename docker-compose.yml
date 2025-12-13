@@ -10,6 +10,8 @@ services:
     # Mount the code for development (optional, good for iterating without rebuilding)
     # volumes:
     #   - .:/app
+    volumes:
+      - ./subscribers.db:/app/subscribers.db
     # Default command (can be overridden)
     # Run in daemon mode by default
     command: [ "--daemon" ]
