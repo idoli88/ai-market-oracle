@@ -44,20 +44,12 @@ Fill in:
 ## Managing Subscribers
 Since this is a multi-tenant system, you need to add phone numbers manually to the database.
 
-### Add a Subscriber
 ```bash
-# Add a number for 30 days
-python manage_users.py add +972501234567 --days 30
-```
+# Add user
+docker exec -it ai_market_oracle python manage_users.py add +972xxxxxxxxx --days 30
 
-### List Subscribers
-```bash
-python manage_users.py list
-```
-
-### Remove a Subscriber
-```bash
-python manage_users.py remove +972501234567
+# List users
+docker exec -it ai_market_oracle python manage_users.py list
 ```
 
 ### Docker Usage

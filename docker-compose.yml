@@ -12,6 +12,7 @@ services:
     #   - .:/app
     volumes:
       - ./subscribers.db:/app/subscribers.db
+      - ./reports:/app/reports
     # Default command (can be overridden)
     # Run in daemon mode by default
     command: [ "--daemon" ]
