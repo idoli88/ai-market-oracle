@@ -5,6 +5,7 @@ from oracle.data import MarketDataFetcher
 from oracle.analysis import TechnicalAnalyst
 from oracle.brain import OracleBrain
 from oracle.notifier import WhatsAppNotifier
+from oracle import database
 from oracle.config import settings
 from oracle.logger import setup_logger
 
@@ -15,6 +16,9 @@ class MarketOracleBot:
         if tickers is None:
             # Default watchlist based on requirements or settings
             tickers = settings.DEFAULT_TICKERS
+            
+        # Initialize DB
+        database.init_db()
         
         self.fetcher = MarketDataFetcher(tickers)
         self.analyst = TechnicalAnalyst()
@@ -74,7 +78,7 @@ class MarketOracleBot:
         if dry_run or settings.DRY_RUN:
             logger.info("[Dry Run] Skipping WhatsApp notification.")
         else:
-            logger.info("Sending notification via WhatsApp...")
+            logger.info("Broadcasting notification via WhatsApp...")
             
             # Optional warning for long messages
             if len(advice) > 1000:
@@ -82,7 +86,20 @@ class MarketOracleBot:
             
             # Construct final message
             final_msg = f"*The Oracle Report ({datetime.now().strftime('%Y-%m-%d')})*\n\n{advice}"
-            self.notifier.send_message(final_msg)
+            
+            # Fetch subscribers
+            subscribers = database.get_active_subscribers()
+            if not subscribers:
+                logger.warning("No active subscribers found.")
+            else:
+                logger.info(f"Found {len(subscribers)} active subscribers.")
+                for phone in subscribers:
+                    try:
+                        self.notifier.send_message(final_msg, phone)
+                        # Avoid rate limits
+                        time.sleep(2) 
+                    except Exception as e:
+                        logger.error(f"Failed to send to {phone}: {e}")
 
         duration = datetime.now() - start_time
         logger.info(f"Mission Complete. Duration: {duration}")

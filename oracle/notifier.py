@@ -8,13 +8,12 @@ logger = setup_logger(__name__)
 
 class WhatsAppNotifier:
     def __init__(self):
-        self.phone = settings.CALLMEBOT_PHONE
         self.api_key = settings.CALLMEBOT_API_KEY
         
-        if not self.phone or not self.api_key:
-            logger.warning("CallMeBot credentials missing. Notifications will fail.")
+        if not self.api_key:
+            logger.warning("CallMeBot API Key missing. Notifications will fail.")
         else:
-            logger.debug("WhatsAppNotifier initialized with credentials")
+            logger.debug("WhatsAppNotifier initialized")
 
     @retry(
         stop=stop_after_attempt(3),
@@ -22,23 +21,24 @@ class WhatsAppNotifier:
         retry=retry_if_exception_type(Exception),
         reraise=True
     )
-    def send_message(self, message: str):
+    def send_message(self, message: str, phone_number: str):
         """
         Send a WhatsApp message via CallMeBot.
         
         Args:
             message (str): The text message to send.
+            phone_number (str): The recipient's phone number.
         """
-        if not self.phone or not self.api_key:
-            logger.error("Cannot send message: Missing credentials.")
+        if not self.api_key:
+            logger.error("Cannot send message: Missing API Key.")
             return
 
         # Encode message for URL
         encoded_msg = urllib.parse.quote(message)
         
-        url = f"https://api.callmebot.com/whatsapp.php?phone={self.phone}&text={encoded_msg}&apikey={self.api_key}"
+        url = f"https://api.callmebot.com/whatsapp.php?phone={phone_number}&text={encoded_msg}&apikey={self.api_key}"
         
-        logger.info("Sending WhatsApp message via CallMeBot")
+        logger.info(f"Sending WhatsApp message to {phone_number} via CallMeBot")
         response = requests.get(url, timeout=10)
         
         if response.status_code == 200:

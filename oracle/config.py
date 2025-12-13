@@ -4,7 +4,6 @@ from typing import List, Optional
 class Settings(BaseSettings):
     # API Keys
     OPENAI_API_KEY: str
-    CALLMEBOT_PHONE: Optional[str] = None
     CALLMEBOT_API_KEY: Optional[str] = None
 
     # Application Settings
