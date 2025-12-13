@@ -1,0 +1,10 @@
+yfinance
+ta
+openai
+python-dotenv
+requests
+pydantic-settings
+pytest
+pytest-mock
+tenacity
+schedule

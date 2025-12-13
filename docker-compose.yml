@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  oracle:
+    build: .
+    container_name: ai_market_oracle
+    # Mount .env file for secrets - ensure this file exists locally!
+    env_file:
+      - .env
+    # Mount the code for development (optional, good for iterating without rebuilding)
+    # volumes:
+    #   - .:/app
+    # Default command (can be overridden)
+    # Run in daemon mode by default
+    command: [ "--daemon" ]
+    restart: "always"
