@@ -14,6 +14,11 @@ def main():
     # List command
     list_parser = subparsers.add_parser('list', help='List all active subscribers')
 
+    # Add Ticker command
+    add_ticker_parser = subparsers.add_parser('add-ticker', help='Add a ticker to a user portfolio')
+    add_ticker_parser.add_argument('phone', type=str, help='Phone number')
+    add_ticker_parser.add_argument('ticker', type=str, help='Ticker symbol (e.g. NVDA)')
+
     # Remove command
     remove_parser = subparsers.add_parser('remove', help='Remove/Deactivate a subscriber')
     remove_parser.add_argument('phone', type=str, help='Phone number to remove')
@@ -29,11 +34,18 @@ def main():
         else:
             print("Error: Failed to add subscriber.")
             
+    elif args.command == 'add-ticker':
+        if database.add_ticker_to_user(args.phone, args.ticker):
+            print(f"Success: Added {args.ticker} to {args.phone}.")
+        else:
+            print(f"Error: Failed to add ticker.")
+            
     elif args.command == 'list':
         users = database.get_active_subscribers()
         print(f"Active Subscribers ({len(users)}):")
         for u in users:
-            print(f" - {u}")
+            tickers = database.get_user_tickers(u)
+            print(f" - {u} [Tickers: {', '.join(tickers)}]")
             
     elif args.command == 'remove':
         if database.remove_subscriber(args.phone):

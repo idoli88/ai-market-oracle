@@ -29,78 +29,112 @@ class MarketOracleBot:
 
     def run(self, dry_run: bool = False):
         """
-        Execute the daily workflow.
-        
-        Args:
-            dry_run (bool): If True, does not send WhatsApp message.
+        Execute the daily workflow using Batch Processing & Personalization.
         """
         start_time = datetime.now()
-        logger.info(f"Starting The Market Oracle... (dry_run={dry_run})")
+        logger.info(f"Starting The Market Oracle (Batch Mode)... (dry_run={dry_run})")
         
-        # 1. Fetch Data
-        logger.info("Fetching market data...")
+        # 1. Get Unique Tickers from ALL users
+        unique_tickers = list(database.get_all_unique_tickers())
+        if not unique_tickers:
+            # Fallback for empty DB or first run
+            unique_tickers = settings.DEFAULT_TICKERS
+            logger.info(f"No tickers in DB. Using default watchlist: {unique_tickers}")
+
+        logger.info(f"Fetching market data for {len(unique_tickers)} unique tickers...")
+        
+        # 2. Fetch Data (One Batch Request)
+        self.fetcher = MarketDataFetcher(unique_tickers)
         data = self.fetcher.fetch_history()
+        
         if not data:
             logger.warning("No data fetched. Exiting.")
             return
 
-        # 2. Analyze Technicals
-        logger.info("Analyzing technical indicators...")
+        # 3. Process Technicals
+        logger.info("Calculating technical indicators...")
         processed_data = self.analyst.process(data)
-        if not processed_data:
-            logger.warning("No valid technical data to process.")
-            return
-            
-        summary = self.analyst.summarize_last_state(processed_data)
         
-        # Generete HTML Report
-        try:
-            report_path = self.analyst.generate_html_report(processed_data)
-            logger.info(f"Report available at: {report_path}")
-        except Exception as e:
-            logger.error(f"Failed to generate HTML report: {e}")
-
-        logger.info("--- Technical Summary ---")
-        # Log line by line for clarity
-        for line in summary.split('\n'):
-            logger.info(line)
-        logger.info("-------------------------")
-
-        # 3. Consult The Oracle (LLM)
-        logger.info("Consulting The Oracle...")
-        advice = self.brain.analyze(summary)
+        # 4. Batch Analysis (LLM)
+        logger.info("Performing Batch AI Analysis...")
+        analysis_map = self._analyze_batch(processed_data)
         
-        logger.info("--- Oracle Advice ---")
-        for line in advice.split('\n'):
-            logger.info(line)
-        logger.info("---------------------")
-
-        # 4. Notify
-        if dry_run or settings.DRY_RUN:
-            logger.info("[Dry Run] Skipping WhatsApp notification.")
-        else:
-            logger.info("Broadcasting notification via WhatsApp...")
-            
-            # Optional warning for long messages
-            if len(advice) > 1000:
-                logger.warning("Message is very long, might get truncated.")
-            
-            # Construct final message
-            final_msg = f"*The Oracle Report ({datetime.now().strftime('%Y-%m-%d')})*\n\n{advice}"
-            
-            # Fetch subscribers
-            subscribers = database.get_active_subscribers()
-            if not subscribers:
-                logger.warning("No active subscribers found.")
-            else:
-                logger.info(f"Found {len(subscribers)} active subscribers.")
-                for phone in subscribers:
-                    try:
-                        self.notifier.send_message(final_msg, phone)
-                        # Avoid rate limits
-                        time.sleep(2) 
-                    except Exception as e:
-                        logger.error(f"Failed to send to {phone}: {e}")
+        # 5. Distribute Personalized Messages
+        logger.info("Distributing personalized reports...")
+        self._distribute_reports(analysis_map, dry_run)
 
         duration = datetime.now() - start_time
         logger.info(f"Mission Complete. Duration: {duration}")
+
+    def _analyze_batch(self, processed_data: dict) -> dict:
+        """
+        Analyze stocks in chunks and parse output into a dictionary.
+        Returns: {'NVDA': 'Analysis...', 'TSLA': 'Analysis...'}
+        """
+        analysis_map = {}
+        
+        # Convert processed data to summary string first
+        chunk_size = 20
+        tickers = list(processed_data.keys())
+        
+        for i in range(0, len(tickers), chunk_size):
+            chunk_tickers = tickers[i:i + chunk_size]
+            logger.info(f"Analyzing batch {i//chunk_size + 1}: {chunk_tickers}")
+            
+            # Prepare summary for this chunk
+            chunk_data = {t: processed_data[t] for t in chunk_tickers}
+            summary_text = self.analyst.summarize_last_state(chunk_data)
+            
+            # Ask LLM
+            response_text = self.brain.analyze(summary_text)
+            
+            # Parse Response
+            for line in response_text.split('\n'):
+                if "|||" in line:
+                    try:
+                        parts = line.split("|||")
+                        if len(parts) >= 3:
+                            t_symbol = parts[0].strip().upper()
+                            t_action = parts[1].strip()
+                            t_reason = parts[2].strip()
+                            analysis_map[t_symbol] = f"{t_action}\n{t_reason}"
+                    except Exception as e:
+                        logger.error(f"Failed to parse line: {line} -> {e}")
+                        
+        return analysis_map
+
+    def _distribute_reports(self, analysis_map: dict, dry_run: bool):
+        """Send personalized messages to each subscriber."""
+        subscribers = database.get_active_subscribers()
+        
+        if not subscribers:
+            logger.warning("No active subscribers.")
+            return
+
+        for phone in subscribers:
+            user_tickers = database.get_user_tickers(phone)
+            if not user_tickers:
+                logger.info(f"User {phone} has no tickers defined. Skipping.")
+                continue
+                
+            # Build Personal Report
+            report_lines = [f"🔮 דו\"ח האורקל שלך ({datetime.now().strftime('%d/%m')})"]
+            
+            for ticker in user_tickers:
+                # Find analysis (handle case mismatch)
+                ticker_upper = ticker.upper()
+                if ticker_upper in analysis_map:
+                    report_lines.append(f"\n🔹 *{ticker_upper}*: {analysis_map[ticker_upper]}")
+                else:
+                    report_lines.append(f"\n🔹 *{ticker_upper}*: אין נתונים/ניתוח.")
+            
+            final_msg = "\n".join(report_lines)
+            
+            if dry_run or settings.DRY_RUN:
+                logger.info(f"[Dry Run] To {phone}:\n{final_msg}")
+            else:
+                try:
+                    self.notifier.send_message(final_msg, phone)
+                    time.sleep(2)  # Rate limit
+                except Exception as e:
+                    logger.error(f"Failed to send to {phone}: {e}")
