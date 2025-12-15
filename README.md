@@ -1,81 +1,76 @@
-# The AI Market Oracle 🔮
+# AI Market Oracle (SaaS MVP)
 
-A "headless" investment decision support system that changes your old laptop into a 24/7 personal market analyst.
-It fetches market data, analyzes it using Technical Indicators (RSI, EMA), consults an LLM (OpenAI) for a Swing Trading strategy, and notifies you via WhatsApp.
+"The AI Market Oracle" is a Python-based personal market analyst agent. It monitors your stock portfolio, analyzes technical indicators and news, and sends concise, actionable insights to your Telegram via an LLM-powered bot.
 
 ## Features
-- **Watchlist**: Monitors QQQ, NVDA, TSLA, LUMI.TA by default.
-- **Technical Analysis**: Calculates RSI(14), EMA(50), EMA(200).
-- **AI Brain**: Uses OpenAI to interpret data with a "Swing Trader" persona.
-- **Notifications**: Sends actionable advice to your WhatsApp using CallMeBot.
-- **Low Resource**: Designed for legacy hardware / Docker.
 
-## Setup
+*   **Smart Updates**: Sends updates 3 times a day (09:00, 14:00, 21:00).
+*   **Cost Efficiency**: Uses a "Gate" logic to query the LLM only when significant events occur (Price change, RSI extreme).
+*   **Telegram Bot**: Manage your portfolio (`/add`, `/remove`) and receive reports directly in Telegram.
+*   **Multi-tenant**: Supports multiple users with individual portfolios.
+*   **Data Sources**: 
+    *   Price/Technicals: `yfinance` (MVP)
+    *   Fundamentals: SEC EDGAR (Stub/Placeholder for MVP)
 
-### 1. Prerequisites
-- Python 3.8+
-- An OpenAI API Key
-- A CallMeBot API Key (Free)
+## Prerequisites
 
-### 2. Installation
-```bash
-# Clone the repo (or just copy the files)
-cd project
+*   Python 3.10+
+*   Docker & Docker Compose (optional)
+*   Telegram Bot Token (from @BotFather)
+*   OpenAI API Key
 
-# Install dependencies
-pip install -r requirements.txt
-```
+## Installation
 
-### 3. Configuration
-Copy the template and edit your secrets:
-```bash
-cp .env.template .env
-nano .env
-```
-Fill in:
-- `OPENAI_API_KEY`
-- `CALLMEBOT_API_KEY`
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/yourusername/ai-market-oracle.git
+    cd ai-market-oracle
+    ```
 
-### 4. How to get CallMeBot API Key
-1. Add the phone number `+34 644 10 55 84` to your Phone Contacts. (Name it "CallMeBot")
-2. Send this message: `I allow callmebot to send me messages` to the new contact created.
-3. Wait until you receive the message "API Activated for your phone number. Your APIKEY is 123123"
+2.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-## Managing Subscribers
-Since this is a multi-tenant system, you need to add phone numbers manually to the database.
-
-```bash
-# Add user
-docker exec -it ai_market_oracle python manage_users.py add +972xxxxxxxxx --days 30
-
-# List users
-docker exec -it ai_market_oracle python manage_users.py list
-```
-
-### Docker Usage
-If running in Docker, you can manage users inside the container:
-```bash
-docker exec -it ai_market_oracle python manage_users.py add +972501234567
-```
+3.  **Configure Environment:**
+    Copy `.env.template` to `.env` and fill in your keys:
+    ```bash
+    cp .env.template .env
+    ```
+    
+    Required variables in `.env`:
+    ```ini
+    OPENAI_API_KEY=sk-...
+    TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
+    SEC_USER_AGENT="YourAppName (admin@example.com)"
+    ```
 
 ## Usage
 
-### Run Manually
+### Running Locally
 ```bash
 python main.py
 ```
 
-### Dry Run (Test without sending WhatsApp)
+### Running with Docker
 ```bash
-python main.py --dry-run
+docker-compose up -d --build
 ```
 
-### Automation (Cron)
-To run every trading day at 11:00 PM (after US close):
-```bash
-crontab -e
-```
-Add:
-```
-0 23 * * 1-5 /usr/bin/python3 /path/to/project/main.py >> /path/to/project/oracle.log 2>&1
-```
+### Telegram Commands
+Start a chat with your bot and use:
+*   `/start` - Register as a subscriber.
+*   `/add TICKER` - Add a stock (e.g., `/add NVDA`, `/add LUMI.TA`).
+*   `/remove TICKER` - Remove a stock.
+*   `/list` - View your portfolio.
+*   `/status` - Check subscription status.
+
+## Architecture
+
+*   **`main.py`**: Orchestrates the Scheduler (threading) and the Telegram Bot (asyncio).
+*   **`oracle/database.py`**: SQLite wrapper for subscriber and portfolio management.
+*   **`oracle/analysis.py`**: The "Gate" logic. Decides if a stock needs an LLM summary.
+*   **`oracle/data_source.py`**: Fetches market data (yfinance) and calculates Technicals (RSI/EMA).
+
+## License
+MIT
