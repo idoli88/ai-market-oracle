@@ -1,19 +1,24 @@
 version: '3.8'
 
 services:
-  oracle:
+  telegram-bot:
     build: .
-    container_name: ai_market_oracle
-    # Mount .env file for secrets - ensure this file exists locally!
+    container_name: oracle_bot
+    command: [ "python", "bot.py" ]
     env_file:
       - .env
-    # Mount the code for development (optional, good for iterating without rebuilding)
-    # volumes:
-    #   - .:/app
     volumes:
       - ./subscribers.db:/app/subscribers.db
       - ./reports:/app/reports
-    # Default command (can be overridden)
-    # Run in daemon mode by default
-    command: [ "--daemon" ]
+    restart: "always"
+
+  oracle-worker:
+    build: .
+    container_name: oracle_worker
+    command: [ "python", "worker.py" ]
+    env_file:
+      - .env
+    volumes:
+      - ./subscribers.db:/app/subscribers.db
+      - ./reports:/app/reports
     restart: "always"

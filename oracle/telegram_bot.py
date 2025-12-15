@@ -8,6 +8,7 @@ import asyncio
 
 from oracle.config import settings
 from oracle import database
+from oracle.message_formatter import split_message
 
 logger = logging.getLogger(__name__)
 
@@ -97,37 +98,64 @@ class OracleBot:
     
     async def send_message_to_user(self, chat_id: int, message: str):
         try:
-            # We need to use the bot instance directly for broadcast
-            await self.app.bot.send_message(chat_id=chat_id, text=message, parse_mode=ParseMode.MARKDOWN)
+            chunks = split_message(message)
+            for chunk in chunks:
+                await self.app.bot.send_message(chat_id=chat_id, text=chunk, parse_mode=ParseMode.HTML)
         except Exception as e:
             logger.error(f"Failed to send message to {chat_id}: {e}")
 
-async def broadcast_report(active_users: List[Dict], reports: Dict[str, str]):
+async def broadcast_report(active_users: List[Dict], reports: Dict[str, Dict], run_type: str = "normal"):
     """
-    active_users: list of user dicts (chat_id, plan)
-    reports: dict of ticker -> formatted report string
+    active_users: list of user dicts (chat_id, plan, notification_pref)
+    reports: dict of ticker -> {'html': str, 'significant': bool}
+    run_type: 'normal' | 'digest'
     """
     bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
     
     for user in active_users:
         chat_id = user["chat_id"]
+        pref = user.get("notification_pref", "standard")
         user_tickers = database.get_user_tickers(chat_id)
         
         # Build user-specific message
-        msg_lines = [f"📊 *עדכון שוק*"]
+        header_text = "סיכום יומי" if run_type == 'digest' else "עדכון שוק"
+        msg_lines = [f"📊 <b>{header_text}</b>"]
         has_content = False
         
         for ticker in user_tickers:
             if ticker in reports:
-                msg_lines.append(reports[ticker])
-                msg_lines.append("---")
-                has_content = True
+                report_data = reports[ticker]
+                is_significant = report_data['significant']
+                report_html = report_data['html']
+                
+                should_send = False
+                
+                # Logic Matrix
+                if pref == "3x_full":
+                    should_send = True
+                elif pref == "digest_only":
+                    if run_type == "digest":
+                        should_send = True
+                elif pref == "alerts_only":
+                    if is_significant:
+                        should_send = True
+                else: # standard
+                    if run_type == "digest":
+                        should_send = True
+                    elif is_significant:
+                        should_send = True
+                
+                if should_send:
+                    msg_lines.append(report_html)
+                    msg_lines.append("---")
+                    has_content = True
         
-        if not has_content:
-            msg_lines.append("אין עדכונים מהותיים עבור המניות שלך כרגע.")
-            
-        final_msg = "\n".join(msg_lines)
-        try:
-            await bot.send_message(chat_id=chat_id, text=final_msg, parse_mode=ParseMode.MARKDOWN)
-        except Exception as e:
-            logger.error(f"Broadcast failed for {chat_id}: {e}")
+        if has_content:
+            final_msg = "\n".join(msg_lines)
+            try:
+                chunks = split_message(final_msg)
+                for chunk in chunks:
+                    await bot.send_message(chat_id=chat_id, text=chunk, parse_mode=ParseMode.HTML)
+            except Exception as e:
+                logger.error(f"Broadcast failed for {chat_id}: {e}")
+        # else: if no content (e.g. no alerts and standard mode), send nothing. Quiet is better.

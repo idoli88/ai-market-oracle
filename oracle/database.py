@@ -24,6 +24,35 @@ def get_db_connection():
     finally:
         conn.close()
 
+
+# --- Subscriber Management ---
+
+def migrate_db():
+    """Check for missing columns and add them (SQLite migration)."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            # Check subscribers table
+            cursor.execute("PRAGMA table_info(subscribers)")
+            columns = [info[1] for info in cursor.fetchall()]
+            
+            if "notification_pref" not in columns:
+                logger.info("Migrating DB: Adding notification_pref to subscribers.")
+                cursor.execute("ALTER TABLE subscribers ADD COLUMN notification_pref TEXT DEFAULT 'standard'")
+                conn.commit()
+            
+            # Check ticker_snapshots table
+            cursor.execute("PRAGMA table_info(ticker_snapshots)")
+            columns_snap = [info[1] for info in cursor.fetchall()]
+            
+            if "last_trigger_type" not in columns_snap:
+                logger.info("Migrating DB: Adding trigger columns to ticker_snapshots.")
+                cursor.execute("ALTER TABLE ticker_snapshots ADD COLUMN last_trigger_type TEXT")
+                cursor.execute("ALTER TABLE ticker_snapshots ADD COLUMN last_trigger_at TIMESTAMP")
+                conn.commit()
+    except Exception as e:
+        logger.error(f"Migration failed: {e}")
+
 def init_db():
     """Initialize the database with all defined tables."""
     try:
@@ -32,14 +61,17 @@ def init_db():
             for table_schema in ALL_TABLES:
                 cursor.execute(table_schema)
             conn.commit()
+        
+        # Run migrations
+        migrate_db()
+        
         logger.info("Database initialized successfully.")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
         raise
 
-# --- Subscriber Management ---
 
-def add_subscriber(chat_id: int, days: int = 30, plan: str = "basic") -> bool:
+def add_subscriber(chat_id: int, days: int = 30, plan: str = "basic", notification_pref: str = "standard") -> bool:
     """Add or update a subscriber by Telegram chat_id."""
     try:
         end_date = datetime.now() + timedelta(days=days)
@@ -51,15 +83,15 @@ def add_subscriber(chat_id: int, days: int = 30, plan: str = "basic") -> bool:
             if exists:
                 cursor.execute("""
                     UPDATE subscribers 
-                    SET is_active = 1, subscription_end_date = ?, plan = ?
+                    SET is_active = 1, subscription_end_date = ?, plan = ?, notification_pref = ?
                     WHERE telegram_chat_id = ?
-                """, (end_date, plan, chat_id))
+                """, (end_date, plan, notification_pref, chat_id))
                 logger.info(f"Updated subscription for {chat_id}. Ends: {end_date}")
             else:
                 cursor.execute("""
-                    INSERT INTO subscribers (telegram_chat_id, is_active, subscription_end_date, plan)
-                    VALUES (?, 1, ?, ?)
-                """, (chat_id, end_date, plan))
+                    INSERT INTO subscribers (telegram_chat_id, is_active, subscription_end_date, plan, notification_pref)
+                    VALUES (?, 1, ?, ?, ?)
+                """, (chat_id, end_date, plan, notification_pref))
                 logger.info(f"Added new subscriber {chat_id}. Ends: {end_date}")
             conn.commit()
         return True
@@ -98,9 +130,13 @@ def get_active_subscribers() -> List[Dict[str, Any]]:
                 logger.info(f"Deactivated {cursor.rowcount} expired subscriptions.")
                 conn.commit()
 
-            cursor.execute("SELECT telegram_chat_id, plan FROM subscribers WHERE is_active = 1")
+            cursor.execute("SELECT telegram_chat_id, plan, notification_pref FROM subscribers WHERE is_active = 1")
             rows = cursor.fetchall()
-            active_users = [{"chat_id": row["telegram_chat_id"], "plan": row["plan"]} for row in rows]
+            active_users = [{
+                "chat_id": row["telegram_chat_id"], 
+                "plan": row["plan"],
+                "notification_pref": row["notification_pref"]
+            } for row in rows]
     except Exception as e:
         logger.error(f"Failed to fetch subscribers: {e}")
     return active_users
@@ -183,28 +219,72 @@ def get_all_unique_tickers() -> Set[str]:
 # --- Caching & Snapshots ---
 
 def get_snapshot(ticker: str) -> Optional[Dict[str, Any]]:
+    """Get the last technical snapshot for a ticker."""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM ticker_snapshots WHERE ticker = ?", (ticker,))
             row = cursor.fetchone()
             if row:
-                return dict(row)
-    except Exception:
-        pass
+                return {
+                    "ticker": row["ticker"],
+                    "last_price": row["last_price"],
+                    "last_rsi": row["last_rsi"],
+                    "last_ema_short": row["last_ema_short"],
+                    "last_ema_long": row["last_ema_long"],
+                    "last_run_at": row["last_run_at"],
+                    "last_action": row["last_action"],
+                    "last_summary_json": row["last_summary_json"],
+                    "last_trigger_type": row["last_trigger_type"],
+                    "last_trigger_at": row["last_trigger_at"]
+                }
+    except Exception as e:
+        logger.error(f"Failed to get snapshot for {ticker}: {e}")
     return None
 
-def update_snapshot(ticker: str, price: float, rsi: float, ema_s: float, ema_l: float, action: str, summary: Dict):
+def update_snapshot(ticker: str, price: float, rsi: float, ema_s: float, ema_l: float, action: str, summary_json: Dict, trigger_type: str = None, trigger_at: datetime = None):
+    """Update or insert technical snapshot."""
     try:
+        current_time = datetime.now()
+        summary_str = json.dumps(summary_json, ensure_ascii=False)
         with get_db_connection() as conn:
-            conn.execute("""
-                INSERT OR REPLACE INTO ticker_snapshots 
-                (ticker, last_price, last_rsi, last_ema_short, last_ema_long, last_run_at, last_action, last_summary_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (ticker, price, rsi, ema_s, ema_l, datetime.now(), action, json.dumps(summary)))
+            cursor = conn.cursor()
+            # If trigger provided, update it. If not, preserve old trigger info??
+            # Actually if we run and NO trigger, maybe we shouldn't wipe the old timestamp 
+            # if we want to check cooldown from LAST trigger? 
+            # But the 'last_run_at' updates every time. 
+            # If we don't trigger now, we shouldn't change last_trigger_at.
+            
+            # Logic: If trigger_type is NOT None, update trigger columns. Else keep existing?
+            # Simpler for now: Check if exists first.
+            
+            cursor.execute("SELECT last_trigger_type, last_trigger_at FROM ticker_snapshots WHERE ticker = ?", (ticker,))
+            existing = cursor.fetchone()
+            
+            new_trigger_type = trigger_type
+            new_trigger_at = trigger_at
+            
+            if not new_trigger_type and existing:
+                new_trigger_type = existing['last_trigger_type']
+                new_trigger_at = existing['last_trigger_at']
+            
+            cursor.execute("""
+                INSERT INTO ticker_snapshots (ticker, last_price, last_rsi, last_ema_short, last_ema_long, last_run_at, last_action, last_summary_json, last_trigger_type, last_trigger_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(ticker) DO UPDATE SET
+                    last_price = excluded.last_price,
+                    last_rsi = excluded.last_rsi,
+                    last_ema_short = excluded.last_ema_short,
+                    last_ema_long = excluded.last_ema_long,
+                    last_run_at = excluded.last_run_at,
+                    last_action = excluded.last_action,
+                    last_summary_json = excluded.last_summary_json,
+                    last_trigger_type = excluded.last_trigger_type,
+                    last_trigger_at = excluded.last_trigger_at
+            """, (ticker, price, rsi, ema_s, ema_l, current_time, action, summary_str, new_trigger_type, new_trigger_at))
             conn.commit()
     except Exception as e:
-        logger.error(f"Snapshot update failed for {ticker}: {e}")
+        logger.error(f"Failed to update snapshot for {ticker}: {e}")
 
 def get_fundamentals_cache(ticker: str) -> Optional[Dict[str, Any]]:
     try:
@@ -229,3 +309,31 @@ def update_fundamentals_cache(ticker: str, data: Dict, source: str = "SEC"):
             conn.commit()
     except Exception as e:
         logger.error(f"Fundamentals cache update failed for {ticker}: {e}")
+
+def get_max_plan_for_ticker(ticker: str) -> str:
+    """
+    Check all subscribers watching this ticker.
+    If ANY user has 'pro' or 'premium', return 'pro'.
+    Else 'basic'.
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            query = """
+                SELECT s.plan 
+                FROM subscribers s
+                JOIN user_portfolios p ON s.telegram_chat_id = p.telegram_chat_id
+                WHERE p.ticker = ? AND s.is_active = 1
+            """
+            cursor.execute(query, (ticker,))
+            rows = cursor.fetchall()
+            
+            for row in rows:
+                plan = row["plan"].lower() if row["plan"] else "basic"
+                if plan in ["pro", "premium", "vip"]:
+                    return "pro"
+            
+            return "basic"
+    except Exception as e:
+        logger.error(f"Error checking plan for {ticker}: {e}")
+        return "basic"

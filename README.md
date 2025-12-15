@@ -47,30 +47,44 @@
 
 ## Usage
 
-### Running Locally
+### Running with Docker (Recommended)
 ```bash
-python main.py
+docker compose up --build -d
 ```
+This starts two services:
+*   `telegram-bot`: Manages user interactions.
+*   `oracle-worker`: Runs the analysis pipeline on a schedule (09:00, 14:00, 21:00).
 
-### Running with Docker
+### User Management (Admin)
+Use the CLI to manage subscribers manually:
+
 ```bash
-docker-compose up -d --build
+# Add a subscriber (Chat ID)
+python manage_users.py add 123456789 --days 30
+
+# Add a stock to user's portfolio
+python manage_users.py add-ticker 123456789 NVDA
+
+# List all subscribers
+python manage_users.py list
 ```
 
 ### Telegram Commands
 Start a chat with your bot and use:
 *   `/start` - Register as a subscriber.
-*   `/add TICKER` - Add a stock (e.g., `/add NVDA`, `/add LUMI.TA`).
+*   `/add TICKER` - Add a stock (e.g., `/add NVDA`).
 *   `/remove TICKER` - Remove a stock.
 *   `/list` - View your portfolio.
 *   `/status` - Check subscription status.
 
 ## Architecture
 
-*   **`main.py`**: Orchestrates the Scheduler (threading) and the Telegram Bot (asyncio).
-*   **`oracle/database.py`**: SQLite wrapper for subscriber and portfolio management.
-*   **`oracle/analysis.py`**: The "Gate" logic. Decides if a stock needs an LLM summary.
-*   **`oracle/data_source.py`**: Fetches market data (yfinance) and calculates Technicals (RSI/EMA).
+*   **`bot.py`**: Entry point for the Telegram Bot service.
+*   **`worker.py`**: Entry point for the Scheduler/Worker service.
+*   **`oracle/pipeline.py`**: Core analysis logic.
+*   **`oracle/database.py`**: SQLite wrapper.
+*   **`oracle/analysis.py`**: The "Gate" logic.
+*   **`oracle/data_source.py`**: Data fetching (yfinance).
 
 ## License
 MIT

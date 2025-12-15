@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS subscribers (
     is_active BOOLEAN DEFAULT 1,
     plan TEXT DEFAULT 'free',
     subscription_end_date TIMESTAMP,
+    notification_pref TEXT DEFAULT 'standard',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 """
@@ -38,7 +39,9 @@ CREATE TABLE IF NOT EXISTS ticker_snapshots (
     last_ema_long REAL,
     last_run_at TIMESTAMP,
     last_action TEXT,
-    last_summary_json TEXT
+    last_summary_json TEXT,
+    last_trigger_type TEXT,
+    last_trigger_at TIMESTAMP
 );
 """
 
