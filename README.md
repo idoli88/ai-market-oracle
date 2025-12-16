@@ -8,7 +8,7 @@
 *   **Cost Efficiency**: Uses a "Gate" logic to query the LLM only when significant events occur (Price change, RSI extreme).
 *   **Telegram Bot**: Manage your portfolio (`/add`, `/remove`) and receive reports directly in Telegram.
 *   **Multi-tenant**: Supports multiple users with individual portfolios.
-*   **Data Sources**: 
+*   **Data Sources**:
     *   Price/Technicals: `yfinance` (MVP)
     *   Fundamentals: SEC EDGAR (Stub/Placeholder for MVP)
 
@@ -37,7 +37,7 @@
     ```bash
     cp .env.template .env
     ```
-    
+
     Required variables in `.env`:
     ```ini
     OPENAI_API_KEY=sk-...

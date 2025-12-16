@@ -1,4 +1,3 @@
-
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 import asyncio
@@ -24,24 +23,24 @@ def test_broadcast_logic(mock_get_tickers, MockBot):
     # Setup
     mock_bot_instance = MockBot.return_value
     mock_bot_instance.send_message = AsyncMock()
-    
+
     # Mock tickers for all users to be AAPL and NVDA
     mock_get_tickers.return_value = ["AAPL", "NVDA"]
 
     # --- Scenario 1: Normal Run ---
     asyncio.run(broadcast_report(active_users, reports, run_type="normal"))
-    
+
     # 100 (Standard): Should get NVDA (Significant). Should NOT get AAPL (Quiet).
     # 200 (Alerts): Should get NVDA. Not AAPL.
     # 300 (Digest): Should get NOTHING.
     # 400 (3x): Should get AAPL AND NVDA.
-    
+
     # Check calls
     # We can inspect send_message calls.
     # Args: chat_id, text, parse_mode
-    
+
     calls = mock_bot_instance.send_message.call_args_list
-    
+
     # Helper to find text sent to chat_id
     def get_msg_for(chat_id):
         msgs = []
@@ -67,7 +66,6 @@ def test_broadcast_logic(mock_get_tickers, MockBot):
     assert "NVDA Report" in msg_400
     assert "AAPL Report" in msg_400
 
-
 @patch("oracle.telegram_bot.Bot")
 @patch("oracle.database.get_user_tickers")
 def test_broadcast_logic_digest(mock_get_tickers, MockBot):
@@ -77,7 +75,7 @@ def test_broadcast_logic_digest(mock_get_tickers, MockBot):
 
     # --- Scenario 2: Digest Run ---
     asyncio.run(broadcast_report(active_users, reports, run_type="digest"))
-    
+
     calls = mock_bot_instance.send_message.call_args_list
     def get_msg_for(chat_id):
         msgs = []
@@ -93,9 +91,9 @@ def test_broadcast_logic_digest(mock_get_tickers, MockBot):
     assert "AAPL Report" in msg_100
     assert "סיכום יומי" in msg_100
 
-    # 200 (Alerts): Should get ONLY Significant? 
+    # 200 (Alerts): Should get ONLY Significant?
     # Logic in code: elif pref == "alerts_only": if is_significant: should_send = True.
-    # So even in digest run, Alerts Only users receive ONLY alerts? 
+    # So even in digest run, Alerts Only users receive ONLY alerts?
     # Yes, that matches "Alerts Only" preference name.
     msg_200 = get_msg_for(200)
     assert "NVDA Report" in msg_200

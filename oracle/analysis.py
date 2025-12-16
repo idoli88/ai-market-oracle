@@ -1,4 +1,3 @@
-
 import logging
 import json
 from typing import Dict, Any, List, Optional
@@ -21,7 +20,7 @@ class AnalysisGate:
         if not snapshot:
             logger.info(f"Gate OPEN for {ticker}: First run/No snapshot")
             return True, "FIRST_RUN"
-        
+
         # 0. Cooldown Check
         last_at = snapshot.get("last_trigger_at")
         if last_at and isinstance(last_at, str):
@@ -30,7 +29,7 @@ class AnalysisGate:
                 last_at = datetime.fromisoformat(last_at)
             except ValueError:
                 pass # Trigger anyway if parse fails
-        
+
         if last_at and isinstance(last_at, datetime):
              # Ensure last_at is offset-naive or aware matching datetime.now()
              # SQLite usually naïve.
@@ -40,21 +39,21 @@ class AnalysisGate:
                  return False, None
 
         triggers = []
-        
+
         # 1. Price Change
         last_price = snapshot.get("last_price")
         if last_price:
             pct_change = abs((current_data["current_price"] - last_price) / last_price) * 100
             if pct_change >= settings.PRICE_CHANGE_TRIGGER_PCT:
                 triggers.append(f"Price Change {pct_change:.2f}%")
-        
+
         # 2. RSI Extreme
         rsi = current_data.get("rsi", 50)
         if rsi >= settings.RSI_OVERBOUGHT:
             triggers.append(f"RSI Overbought {rsi}")
         elif rsi <= settings.RSI_OVERSOLD:
             triggers.append(f"RSI Oversold {rsi}")
-            
+
         # 3. RSI Delta (Spike)
         last_rsi = snapshot.get("last_rsi")
         if last_rsi:
@@ -75,25 +74,25 @@ class AnalysisGate:
         c_ema = current_data["ema_short"]
         l_price = snapshot.get("last_price")
         l_ema = snapshot.get("last_ema_short")
-        
+
         if l_price and l_ema:
             if l_price < l_ema and c_price > c_ema:
                 triggers.append("Bullish EMA50 Cross")
             elif l_price > l_ema and c_price < c_ema:
                 triggers.append("Bearish EMA50 Cross")
-        
+
         if triggers:
             reason = ", ".join(triggers)
             logger.info(f"Gate OPEN for {ticker}: {reason}")
             return True, reason
-            
+
         logger.info(f"Gate CLOSED for {ticker}")
         return False, None
 
 class LLMClient:
     def __init__(self):
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
-        
+
     def analyze_ticker(self, ticker: str, data: Dict, context: str = "", diff_context: str = "", plan: str = "basic") -> Dict:
         """
         Send data to LLM and get JSON response.
@@ -102,11 +101,11 @@ class LLMClient:
         - Else use Basic Model.
         """
         model = settings.MODEL_BASIC
-        
+
         # Routing Logic
         price_change = abs(data.get('price_change_pct', 0))
         is_major_event = price_change > settings.MAJOR_EVENT_THRESHOLD_PCT or "Volume" in context
-        
+
         if plan == "pro" and is_major_event:
             model = settings.MODEL_HQ
             logger.info(f"Using HQ Model ({model}) for {ticker} (Plan: Pro, Event: Major)")
@@ -115,7 +114,7 @@ class LLMClient:
 
         user_prompt = f"""
         Analyze {ticker} for a swing trader.
-        
+
         Data:
         Price: {data.get('current_price')}
         Change: {data.get('price_change_pct')}%
@@ -123,13 +122,13 @@ class LLMClient:
         EMA50: {data.get('ema_short')}
         EMA200: {data.get('ema_long')}
         ATR: {data.get('atr')}
-        
+
         Changes since last:
         {diff_context}
-        
+
         Context/Trigger:
         {context}
-        
+
         Output Schema (JSON):
         {{
             "action": "BUY" | "SELL" | "HOLD",
@@ -141,7 +140,7 @@ class LLMClient:
             "risk_note_he": "Risk management note"
         }}
         """
-        
+
         try:
             response = self.client.chat.completions.create(
                 model=model,
@@ -152,15 +151,15 @@ class LLMClient:
                 response_format={"type": "json_object"},
                 temperature=0.2
             )
-            
+
             content = response.choices[0].message.content
             if not content:
                 raise ValueError("Empty response from LLM")
-                
+
             # Validation
             validated = AnalysisResponse.model_validate_json(content)
             return validated.model_dump()
-            
+
         except (ValidationError, Exception) as e:
             logger.error(f"LLM Analysis Failed for {ticker}: {e}")
             return self._fallback_response(ticker, data)

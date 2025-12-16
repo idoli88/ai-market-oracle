@@ -1,4 +1,3 @@
-
 import sqlite3
 import datetime
 from typing import List, Optional, Any, Dict
@@ -45,6 +44,18 @@ CREATE TABLE IF NOT EXISTS ticker_snapshots (
 );
 """
 
+CREATE_NEWS_CACHE_TABLE = """
+CREATE TABLE IF NOT EXISTS news_cache (
+    ticker TEXT,
+    title TEXT,
+    url TEXT,
+    source TEXT,
+    published_at TIMESTAMP,
+    fetched_at TIMESTAMP,
+    PRIMARY KEY (ticker, url)
+);
+"""
+
 CREATE_FUNDAMENTALS_CACHE_TABLE = """
 CREATE TABLE IF NOT EXISTS fundamentals_cache (
     ticker TEXT PRIMARY KEY,
@@ -63,15 +74,6 @@ CREATE TABLE IF NOT EXISTS filings_checkpoint (
     last_accession_or_id TEXT,
     last_filing_date TEXT,
     filings_json TEXT
-);
-"""
-
-CREATE_NEWS_CACHE_TABLE = """
-CREATE TABLE IF NOT EXISTS news_cache (
-    ticker TEXT PRIMARY KEY,
-    source TEXT,
-    last_checked TIMESTAMP,
-    items_json TEXT
 );
 """
 

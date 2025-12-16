@@ -1,4 +1,3 @@
-
 import sqlite3
 import json
 import logging
@@ -8,22 +7,26 @@ from contextlib import contextmanager
 
 from oracle.logger import setup_logger
 from oracle.config import settings
-from oracle.db_models import ALL_TABLES, CREATE_SUBSCRIBERS_TABLE
+from oracle.db_models import (
+    ALL_TABLES,
+    CREATE_SUBSCRIBERS_TABLE,
+    CREATE_USER_PORTFOLIOS_TABLE,
+    CREATE_TICKER_SNAPSHOTS_TABLE,
+    CREATE_FUNDAMENTALS_CACHE_TABLE,
+    CREATE_NEWS_CACHE_TABLE
+)
 
 logger = setup_logger(__name__)
-
-DB_PATH = settings.DB_PATH
 
 @contextmanager
 def get_db_connection():
     """Context manager for database connections."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(settings.DB_PATH)
     conn.row_factory = sqlite3.Row # Enable access by column name
     try:
         yield conn
     finally:
         conn.close()
-
 
 # --- Subscriber Management ---
 
@@ -33,23 +36,30 @@ def migrate_db():
         with get_db_connection() as conn:
             cursor = conn.cursor()
             # Check subscribers table
-            cursor.execute("PRAGMA table_info(subscribers)")
-            columns = [info[1] for info in cursor.fetchall()]
-            
-            if "notification_pref" not in columns:
-                logger.info("Migrating DB: Adding notification_pref to subscribers.")
-                cursor.execute("ALTER TABLE subscribers ADD COLUMN notification_pref TEXT DEFAULT 'standard'")
-                conn.commit()
-            
-            # Check ticker_snapshots table
-            cursor.execute("PRAGMA table_info(ticker_snapshots)")
-            columns_snap = [info[1] for info in cursor.fetchall()]
-            
-            if "last_trigger_type" not in columns_snap:
-                logger.info("Migrating DB: Adding trigger columns to ticker_snapshots.")
-                cursor.execute("ALTER TABLE ticker_snapshots ADD COLUMN last_trigger_type TEXT")
-                cursor.execute("ALTER TABLE ticker_snapshots ADD COLUMN last_trigger_at TIMESTAMP")
-                conn.commit()
+            # Create Tables (if they don't exist)
+            conn.execute(CREATE_SUBSCRIBERS_TABLE)
+            conn.execute(CREATE_USER_PORTFOLIOS_TABLE)
+            conn.execute(CREATE_TICKER_SNAPSHOTS_TABLE)
+            conn.execute(CREATE_FUNDAMENTALS_CACHE_TABLE)
+            conn.execute(CREATE_NEWS_CACHE_TABLE)
+
+            # Migrations
+            # 1. Add notification_pref if missing
+            try:
+                 conn.execute("ALTER TABLE subscribers ADD COLUMN notification_pref TEXT DEFAULT 'standard'")
+                 logger.info("Migrating DB: Added notification_pref to subscribers.")
+            except sqlite3.OperationalError:
+                 pass
+
+            # 2. Add last_trigger details if missing
+            try:
+                 conn.execute("ALTER TABLE ticker_snapshots ADD COLUMN last_trigger_type TEXT")
+                 conn.execute("ALTER TABLE ticker_snapshots ADD COLUMN last_trigger_at TIMESTAMP")
+                 logger.info("Migrating DB: Added trigger columns to ticker_snapshots.")
+            except sqlite3.OperationalError:
+                 pass
+
+            conn.commit()
     except Exception as e:
         logger.error(f"Migration failed: {e}")
 
@@ -61,15 +71,14 @@ def init_db():
             for table_schema in ALL_TABLES:
                 cursor.execute(table_schema)
             conn.commit()
-        
+
         # Run migrations
         migrate_db()
-        
+
         logger.info("Database initialized successfully.")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
         raise
-
 
 def add_subscriber(chat_id: int, days: int = 30, plan: str = "basic", notification_pref: str = "standard") -> bool:
     """Add or update a subscriber by Telegram chat_id."""
@@ -79,10 +88,10 @@ def add_subscriber(chat_id: int, days: int = 30, plan: str = "basic", notificati
             cursor = conn.cursor()
             cursor.execute("SELECT id FROM subscribers WHERE telegram_chat_id = ?", (chat_id,))
             exists = cursor.fetchone()
-            
+
             if exists:
                 cursor.execute("""
-                    UPDATE subscribers 
+                    UPDATE subscribers
                     SET is_active = 1, subscription_end_date = ?, plan = ?, notification_pref = ?
                     WHERE telegram_chat_id = ?
                 """, (end_date, plan, notification_pref, chat_id))
@@ -118,12 +127,12 @@ def get_active_subscribers() -> List[Dict[str, Any]]:
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Deactivate expired
             now = datetime.now()
             cursor.execute("""
-                UPDATE subscribers 
-                SET is_active = 0 
+                UPDATE subscribers
+                SET is_active = 0
                 WHERE subscription_end_date < ? AND is_active = 1
             """, (now,))
             if cursor.rowcount > 0:
@@ -133,7 +142,7 @@ def get_active_subscribers() -> List[Dict[str, Any]]:
             cursor.execute("SELECT telegram_chat_id, plan, notification_pref FROM subscribers WHERE is_active = 1")
             rows = cursor.fetchall()
             active_users = [{
-                "chat_id": row["telegram_chat_id"], 
+                "chat_id": row["telegram_chat_id"],
                 "plan": row["plan"],
                 "notification_pref": row["notification_pref"]
             } for row in rows]
@@ -162,19 +171,19 @@ def add_ticker_to_user(chat_id: int, ticker: str) -> Tuple[bool, str]:
         ticker = ticker.upper().strip()
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Check limit (6)
             cursor.execute("SELECT COUNT(*) FROM user_portfolios WHERE telegram_chat_id = ?", (chat_id,))
             count = cursor.fetchone()[0]
             if count >= 6:
                 return False, "Limit reached (max 6 tickers)."
-                
+
             cursor.execute("""
-                INSERT OR IGNORE INTO user_portfolios (telegram_chat_id, ticker) 
+                INSERT OR IGNORE INTO user_portfolios (telegram_chat_id, ticker)
                 VALUES (?, ?)
             """, (chat_id, ticker))
             conn.commit()
-            
+
         logger.info(f"Added {ticker} to {chat_id}")
         return True, f"Added {ticker}."
     except Exception as e:
@@ -250,24 +259,24 @@ def update_snapshot(ticker: str, price: float, rsi: float, ema_s: float, ema_l: 
         with get_db_connection() as conn:
             cursor = conn.cursor()
             # If trigger provided, update it. If not, preserve old trigger info??
-            # Actually if we run and NO trigger, maybe we shouldn't wipe the old timestamp 
-            # if we want to check cooldown from LAST trigger? 
-            # But the 'last_run_at' updates every time. 
+            # Actually if we run and NO trigger, maybe we shouldn't wipe the old timestamp
+            # if we want to check cooldown from LAST trigger?
+            # But the 'last_run_at' updates every time.
             # If we don't trigger now, we shouldn't change last_trigger_at.
-            
+
             # Logic: If trigger_type is NOT None, update trigger columns. Else keep existing?
             # Simpler for now: Check if exists first.
-            
+
             cursor.execute("SELECT last_trigger_type, last_trigger_at FROM ticker_snapshots WHERE ticker = ?", (ticker,))
             existing = cursor.fetchone()
-            
+
             new_trigger_type = trigger_type
             new_trigger_at = trigger_at
-            
+
             if not new_trigger_type and existing:
                 new_trigger_type = existing['last_trigger_type']
                 new_trigger_at = existing['last_trigger_at']
-            
+
             cursor.execute("""
                 INSERT INTO ticker_snapshots (ticker, last_price, last_rsi, last_ema_short, last_ema_long, last_run_at, last_action, last_summary_json, last_trigger_type, last_trigger_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -320,20 +329,197 @@ def get_max_plan_for_ticker(ticker: str) -> str:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             query = """
-                SELECT s.plan 
+                SELECT s.plan
                 FROM subscribers s
                 JOIN user_portfolios p ON s.telegram_chat_id = p.telegram_chat_id
                 WHERE p.ticker = ? AND s.is_active = 1
             """
             cursor.execute(query, (ticker,))
             rows = cursor.fetchall()
-            
+
             for row in rows:
                 plan = row["plan"].lower() if row["plan"] else "basic"
                 if plan in ["pro", "premium", "vip"]:
                     return "pro"
-            
+
             return "basic"
     except Exception as e:
         logger.error(f"Error checking plan for {ticker}: {e}")
         return "basic"
+
+def get_cached_news(ticker: str, ttl_minutes: int = 60) -> List[Dict]:
+    """
+    Get valid cached news (younger than TTL).
+    """
+    try:
+        with get_db_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            # Check fetch time
+            cursor.execute("""
+                SELECT * FROM news_cache
+                WHERE ticker = ?
+                ORDER BY published_at DESC
+                LIMIT 5
+            """, (ticker,))
+            rows = cursor.fetchall()
+
+            if not rows:
+                return []
+
+            # Check TTL of the batch (using first item's fetch time)
+            last_fetch = datetime.fromisoformat(rows[0]['fetched_at'])
+            age_minutes = (datetime.now() - last_fetch).total_seconds() / 60
+
+            if age_minutes > ttl_minutes:
+                return []
+
+            return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Error reading news cache for {ticker}: {e}")
+        return []
+
+def update_news_cache(ticker: str, news_items: List[Dict]):
+    """
+    Replace cache for ticker with new items.
+    """
+    if not news_items:
+        return
+
+    try:
+        with get_db_connection() as conn:
+            # Clear old
+            conn.execute("DELETE FROM news_cache WHERE ticker = ?", (ticker,))
+
+            fetched_at = datetime.now()
+            data = []
+            for item in news_items:
+                data.append((
+                    ticker,
+                    item.get('title'),
+                    item.get('url'),
+                    item.get('source'),
+                    item.get('published_at', datetime.now()),
+                    fetched_at
+                ))
+
+            conn.executemany("""
+                INSERT INTO news_cache (ticker, title, url, source, published_at, fetched_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, data)
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Error updating news cache for {ticker}: {e}")
+
+def get_fundamentals(ticker: str, ttl_days: int = 7) -> Optional[Dict]:
+    """
+    Get cached fundamentals if fresh (within TTL).
+    """
+    try:
+        with get_db_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM fundamentals_cache
+                WHERE ticker = ?
+            """, (ticker,))
+            row = cursor.fetchone()
+
+            if not row:
+                return None
+
+            # Check TTL
+            last_updated = datetime.fromisoformat(row['last_updated'])
+            age_days = (datetime.now() - last_updated).days
+
+            if age_days > ttl_days:
+                return None
+
+            # Parse JSON data
+            return {
+                'ticker': ticker,
+                'kpis': json.loads(row['data_json']),
+                'source': row['source'],
+                'last_updated': row['last_updated'],
+                'period': row['period']
+            }
+    except Exception as e:
+        logger.error(f"Error reading fundamentals for {ticker}: {e}")
+        return None
+
+def update_fundamentals(ticker: str, kpis: Dict, source: str = "SEC_EDGAR", period: str = "latest"):
+    """
+    Update fundamentals cache for ticker.
+    """
+    try:
+        with get_db_connection() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO fundamentals_cache
+                (ticker, source, last_updated, data_json, period)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                ticker,
+                source,
+                datetime.now().isoformat(),
+                json.dumps(kpis),
+                period
+            ))
+            conn.commit()
+            logger.info(f"Updated fundamentals for {ticker}")
+    except Exception as e:
+        logger.error(f"Error updating fundamentals for {ticker}: {e}")
+
+def get_filing_checkpoint(ticker: str) -> Optional[Dict]:
+    """
+    Get last processed filing checkpoint for ticker.
+    """
+    try:
+        with get_db_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM filings_checkpoint
+                WHERE ticker = ?
+            """, (ticker,))
+            row = cursor.fetchone()
+
+            if not row:
+                return None
+
+            return {
+                'ticker': ticker,
+                'source': row['source'],
+                'last_checked': row['last_checked'],
+                'last_accession_or_id': row['last_accession_or_id'],
+                'last_filing_date': row['last_filing_date'],
+                'filings_json': json.loads(row['filings_json']) if row['filings_json'] else None
+            }
+    except Exception as e:
+        logger.error(f"Error reading filing checkpoint for {ticker}: {e}")
+        return None
+
+def update_filing_checkpoint(ticker: str, accession: str, filing_date: str, source: str = "SEC_EDGAR"):
+    """
+    Update filing checkpoint for ticker.
+    """
+    try:
+        with get_db_connection() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO filings_checkpoint
+                (ticker, source, last_checked, last_accession_or_id, last_filing_date, filings_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                ticker,
+                source,
+                datetime.now().isoformat(),
+                accession,
+                filing_date,
+                None  # Can store detailed filing info if needed
+            ))
+            conn.commit()
+            logger.info(f"Updated filing checkpoint for {ticker}: {accession}")
+    except Exception as e:
+        logger.error(f"Error updating filing checkpoint for {ticker}: {e}")

@@ -43,4 +43,3 @@ USER appuser
 
 # Default command
 CMD ["python", "bot.py"]
-

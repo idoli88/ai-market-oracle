@@ -1,4 +1,3 @@
-
 import logging
 import asyncio
 from oracle.config import settings
@@ -15,14 +14,14 @@ logger = logging.getLogger("bot_service")
 
 def main():
     logger.info("Initializing Telegram Bot Service...")
-    
+
     # Initialize Database
     database.init_db()
-    
+
     # Start Bot
     bot = OracleBot()
     logger.info("Starting polling...")
-    
+
     try:
         # run_polling() is blocking and manages its own loop
         bot.app.run_polling()

@@ -1,4 +1,3 @@
-
 import logging
 from typing import List, Dict
 from telegram import Update, Bot
@@ -30,7 +29,7 @@ class OracleBot:
         logger.info("Starting Telegram Bot polling...")
         # In a real production app with a scheduler loop, we might need a separate thread or process.
         # For MVP, we can run this alongside the scheduler if we manage the loop carefully.
-        # But telegram's run_polling is blocking. 
+        # But telegram's run_polling is blocking.
         # We will use main.py to handle the scheduler, so the bot might need to run in a background task
         # or we just rely on webhooks. For simplicity here (MVP), polling is fine if main script handles it.
         await self.app.run_polling()
@@ -60,7 +59,7 @@ class OracleBot:
         if not context.args:
             await update.message.reply_text("אנא ציין סימול, למשל: /add NVDA")
             return
-        
+
         ticker = context.args[0]
         success, msg = database.add_ticker_to_user(chat_id, ticker)
         await update.message.reply_text(msg)
@@ -95,7 +94,7 @@ class OracleBot:
             await update.message.reply_text("אינך רשום.")
 
     # --- Broadcast ---
-    
+
     async def send_message_to_user(self, chat_id: int, message: str):
         try:
             chunks = split_message(message)
@@ -111,25 +110,25 @@ async def broadcast_report(active_users: List[Dict], reports: Dict[str, Dict], r
     run_type: 'normal' | 'digest'
     """
     bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
-    
+
     for user in active_users:
         chat_id = user["chat_id"]
         pref = user.get("notification_pref", "standard")
         user_tickers = database.get_user_tickers(chat_id)
-        
+
         # Build user-specific message
         header_text = "סיכום יומי" if run_type == 'digest' else "עדכון שוק"
         msg_lines = [f"📊 <b>{header_text}</b>"]
         has_content = False
-        
+
         for ticker in user_tickers:
             if ticker in reports:
                 report_data = reports[ticker]
                 is_significant = report_data['significant']
                 report_html = report_data['html']
-                
+
                 should_send = False
-                
+
                 # Logic Matrix
                 if pref == "3x_full":
                     should_send = True
@@ -144,12 +143,12 @@ async def broadcast_report(active_users: List[Dict], reports: Dict[str, Dict], r
                         should_send = True
                     elif is_significant:
                         should_send = True
-                
+
                 if should_send:
                     msg_lines.append(report_html)
                     msg_lines.append("---")
                     has_content = True
-        
+
         if has_content:
             final_msg = "\n".join(msg_lines)
             try:

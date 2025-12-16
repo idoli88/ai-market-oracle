@@ -1,4 +1,3 @@
-
 import logging
 import time
 import schedule
@@ -44,7 +43,7 @@ def main():
     for t in settings.RUN_TIMES:
         # Determine Run Type
         r_type = "digest" if t == "21:00" else "normal"
-        
+
         schedule.every().day.at(t).do(job_runner, dry_run=False, run_type=r_type)
         logger.info(f"Scheduled job at {t} (Type: {r_type})")
 

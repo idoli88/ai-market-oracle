@@ -9,3 +9,4 @@ pytest-mock
 tenacity
 schedule
 python-telegram-bot
+feedparser

@@ -1,4 +1,3 @@
-
 import pytest
 from datetime import datetime, timedelta
 from oracle.analysis import AnalysisGate
@@ -7,21 +6,21 @@ from oracle.config import settings
 # Mock Data
 mock_snapshot_empty = None
 mock_snapshot_old = {
-    "last_price": 100, 
-    "last_rsi": 50, 
+    "last_price": 100,
+    "last_rsi": 50,
     "last_ema_short": 100,
     "last_trigger_at": (datetime.now() - timedelta(hours=5)).isoformat() # Processed string
 }
 
 mock_snapshot_recent = {
-    "last_price": 100, 
-    "last_rsi": 50, 
+    "last_price": 100,
+    "last_rsi": 50,
     "last_trigger_at": (datetime.now() - timedelta(minutes=10)).isoformat()
 }
 
 def test_first_run():
     current = {
-        "current_price": 100, 
+        "current_price": 100,
         "ema_short": 100,
         "current_volume": 100,
         "volume_sma": 100
@@ -32,12 +31,12 @@ def test_first_run():
 
 def test_cooldown_active():
     current = {
-        "current_price": 200, 
+        "current_price": 200,
         "rsi": 90,
         "ema_short": 100,
         "current_volume": 100,
         "volume_sma": 100
-    } 
+    }
     should, reason = AnalysisGate.should_trigger_llm("AAPL", current, mock_snapshot_recent)
     assert should is False
     assert reason is None
@@ -45,7 +44,7 @@ def test_cooldown_active():
 def test_cooldown_expired_but_no_change():
     current = {
         "current_price": 100, # No change
-        "rsi": 50, 
+        "rsi": 50,
         "ema_short": 100,
         "current_volume": 100,
         "volume_sma": 100
@@ -68,7 +67,7 @@ def test_price_change_trigger():
 
 def test_rsi_trigger():
     current = {
-        "current_price": 100, 
+        "current_price": 100,
         "rsi": 80,
         "ema_short": 100,
         "current_volume": 100,
@@ -81,7 +80,7 @@ def test_rsi_trigger():
 def test_rsi_delta_trigger():
     # Last RSI 50. Delta Trigger 10.
     current = {
-        "current_price": 100, 
+        "current_price": 100,
         "rsi": 65,
         "ema_short": 100,
         "current_volume": 100,
@@ -114,7 +113,7 @@ def test_ema_cross_bullish():
         "last_ema_short": 100, # Price below EMA
         "last_trigger_at": (datetime.now() - timedelta(hours=5)).isoformat()
     }
-    
+
     current = {
         "current_price": 105,
         "ema_short": 100, # Crossed above

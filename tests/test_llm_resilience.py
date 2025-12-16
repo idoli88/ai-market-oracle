@@ -1,4 +1,3 @@
-
 import pytest
 from unittest.mock import MagicMock, patch
 from oracle.analysis import LLMClient
@@ -20,7 +19,7 @@ valid_json_response = """
 
 invalid_json_response = """
 {
-    "action": "INVALID", 
+    "action": "INVALID",
     "confidence": 2.0
 }
 """
@@ -31,10 +30,10 @@ def test_valid_response(MockOpenAI):
     mock_client.chat.completions.create.return_value.choices = [
         MagicMock(message=MagicMock(content=valid_json_response))
     ]
-    
+
     llm = LLMClient()
     result = llm.analyze_ticker("AAPL", {"current_price": 100})
-    
+
     assert result["action"] == "BUY"
     assert result["confidence"] == 0.9
 
@@ -44,10 +43,10 @@ def test_fallback_on_invalid_schema(MockOpenAI):
     mock_client.chat.completions.create.return_value.choices = [
         MagicMock(message=MagicMock(content=invalid_json_response))
     ]
-    
+
     llm = LLMClient()
     result = llm.analyze_ticker("AAPL", {"current_price": 100})
-    
+
     assert result["action"] == "HOLD" # Fallback default
     assert "שגיאה בניתוח" in str(result["key_points_he"])
 
@@ -57,11 +56,11 @@ def test_routing_basic(MockOpenAI):
     mock_client.chat.completions.create.return_value.choices = [
         MagicMock(message=MagicMock(content=valid_json_response))
     ]
-    
+
     llm = LLMClient()
     # Plan basic -> Basic model
     llm.analyze_ticker("AAPL", {"price_change_pct": 5.0}, plan="basic")
-    
+
     call_args = mock_client.chat.completions.create.call_args[1]
     assert call_args["model"] == settings.MODEL_BASIC
 
@@ -71,11 +70,11 @@ def test_routing_pro_major_event(MockOpenAI):
     mock_client.chat.completions.create.return_value.choices = [
         MagicMock(message=MagicMock(content=valid_json_response))
     ]
-    
+
     llm = LLMClient()
     # Plan pro + Major Event (>3%) -> HQ model
     llm.analyze_ticker("AAPL", {"price_change_pct": 4.0}, plan="pro")
-    
+
     call_args = mock_client.chat.completions.create.call_args[1]
     assert call_args["model"] == settings.MODEL_HQ
 
@@ -85,10 +84,10 @@ def test_routing_pro_minor_event(MockOpenAI):
     mock_client.chat.completions.create.return_value.choices = [
         MagicMock(message=MagicMock(content=valid_json_response))
     ]
-    
+
     llm = LLMClient()
     # Plan pro + Minor Event (<3%) -> Basic model
     llm.analyze_ticker("AAPL", {"price_change_pct": 1.0}, plan="pro")
-    
+
     call_args = mock_client.chat.completions.create.call_args[1]
     assert call_args["model"] == settings.MODEL_BASIC

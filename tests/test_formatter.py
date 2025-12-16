@@ -1,4 +1,3 @@
-
 import pytest
 from oracle.message_formatter import safe_html, format_report, split_message
 
@@ -16,9 +15,9 @@ def test_format_report_escaping():
         'summary_he': 'Dangerous <script>',
         'risk_note_he': 'Risk > 9000'
     }
-    
+
     report = format_report(ticker, technicals, analysis)
-    
+
     assert "&lt;NVDA&gt;" in report
     assert "BUY &amp; HOLD" in report
     assert "Dangerous &lt;script&gt;" in report
@@ -34,16 +33,16 @@ def test_split_message_short():
 def test_split_message_long():
     # Create a message of length 150
     # "Line 1..." is 10 chars. 15 lines = 150 chars.
-    lines = [f"Line {i:02d}" for i in range(15)] 
+    lines = [f"Line {i:02d}" for i in range(15)]
     long_msg = "\n".join(lines) # 15 lines joined by \n
-    
+
     # Split max 50
     chunks = split_message(long_msg, max_length=50)
-    
+
     assert len(chunks) > 1
     for chunk in chunks:
         assert len(chunk) <= 50
-    
+
     # Verify content preservation
     reconstructed = "".join(chunks)
     # split_message might eat some newlines if it splits exactly on them or lstrips.
@@ -52,7 +51,7 @@ def test_split_message_long():
     # rfind returns index of newline. text[:split_at] EXCLUDES newline.
     # text[split_at:] INCLUDES newline. lstrip removes leading whitespace (newline).
     # So yes, one newline might be lost per chunk. That's acceptable for Telegram splitting (usually preferred).
-    
+
     assert "Line 00" in chunks[0]
     assert "Line 14" in chunks[-1]
 
@@ -68,5 +67,5 @@ def test_format_report_with_diff():
     analysis = {'action': 'HOLD'}
     diff_str = "Since last: +5.0%, RSI +2.0"
     report = format_report("AAPL", technicals, analysis, diff_str=diff_str)
-    
+
     assert "<i>Since last: +5.0%, RSI +2.0</i>" in report

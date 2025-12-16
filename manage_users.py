@@ -25,7 +25,7 @@ def main():
     remove_parser.add_argument('chat_id', type=int, help='Telegram Chat ID to remove')
 
     args = parser.parse_args()
-    
+
     # Ensure DB is initialized
     database.init_db()
 
@@ -34,14 +34,14 @@ def main():
             print(f"Success: Subscriber {args.chat_id} added/updated for {args.days} days. Pref: {args.pref}")
         else:
             print("Error: Failed to add subscriber.")
-            
+
     elif args.command == 'add-ticker':
         success, msg = database.add_ticker_to_user(args.chat_id, args.ticker)
         if success:
             print(f"Success: Added {args.ticker} to {args.chat_id}. ({msg})")
         else:
             print(f"Error: Failed to add ticker. ({msg})")
-            
+
     elif args.command == 'list':
         users = database.get_active_subscribers()
         print(f"Active Subscribers ({len(users)}):")
@@ -50,13 +50,13 @@ def main():
             pref = u.get('notification_pref', 'standard')
             tickers = database.get_user_tickers(chat_id)
             print(f" - {chat_id} [Plan: {u.get('plan', 'basic')}] [Pref: {pref}] [Tickers: {', '.join(tickers)}]")
-            
+
     elif args.command == 'remove':
         if database.remove_subscriber(args.chat_id):
             print(f"Success: Subscriber {args.chat_id} deactivated.")
         else:
             print("Error: Failed to remove subscriber.")
-            
+
     else:
         parser.print_help()
 
