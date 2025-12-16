@@ -13,3 +13,4 @@ venv/
 .idea
 *.md
 tests/
+subscribers.db

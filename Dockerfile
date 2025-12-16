@@ -1,37 +1,45 @@
-# Use an official Python runtime as a parent image
-FROM python:3.9-slim
+# Stage 1: Builder
+FROM python:3.9-slim as builder
 
-# Set environment variables
-# PYTHONDONTWRITEBYTECODE: Prevents Python from writing pyc files to disc
-# PYTHONUNBUFFERED: Prevents Python buffering stdout and stderr
+WORKDIR /app
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Create a non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
-# Set work directory
-WORKDIR /app
-
-# Install system dependencies (none currently needed for pure python deps, but good practice to have apt-get update)
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install python dependencies
-# Copy requirements first to leverage Docker cache
+# Create venv and install dependencies
 COPY requirements.txt .
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application code
+# Stage 2: Runtime
+FROM python:3.9-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Create a non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Copy venv from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy application code
 COPY . .
 
-# Change ownership of the app directory to the non-root user
+# Change ownership
 RUN chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
 
-# Run the application
-# We use ["python", "main.py"] so arguments can be appended easily
-ENTRYPOINT ["python", "main.py"]
+# Default command
+CMD ["python", "bot.py"]

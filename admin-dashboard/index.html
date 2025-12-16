@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - האורקל</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&display=swap" rel="stylesheet">
+
+    <!-- Chart.js for analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: 'Heebo', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100">
+
+    <!-- Login Screen (shown when not authenticated) -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center">
+        <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full">
+            <div class="text-center mb-6">
+                <div class="text-4xl mb-2">🔮</div>
+                <h1 class="text-2xl font-bold">האורקל - Admin</h1>
+            </div>
+
+            <form onsubmit="handleAdminLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">שם משתמש</label>
+                    <input type="text" id="admin-username" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">סיסמה</label>
+                    <input type="password" id="admin-password" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <button type="submit"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">
+                    התחבר
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard (shown when authenticated) -->
+    <div id="admin-dashboard" class="hidden min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">🔮</span>
+                        <h1 class="text-xl font-bold">האורקל - ניהול</h1>
+                    </div>
+                    <button onclick="adminLogout()" class="text-gray-600 hover:text-gray-900 font-medium">
+                        התנתק
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+            <!-- Analytics Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-sm text-gray-600 mb-1">סה"כ משתמשים</div>
+                    <div id="total-users" class="text-3xl font-bold text-blue-600">-</div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-sm text-gray-600 mb-1">מנויים פעילים</div>
+                    <div id="active-subs" class="text-3xl font-bold text-green-600">-</div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-sm text-gray-600 mb-1">הכנסה חודשית</div>
+                    <div id="monthly-revenue" class="text-3xl font-bold text-purple-600">-</div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="text-sm text-gray-600 mb-1">אחוז נטישה</div>
+                    <div id="churn-rate" class="text-3xl font-bold text-red-600">-</div>
+                </div>
+            </div>
+
+            <!-- Users Table -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h2 class="text-lg font-bold">משתמשים</h2>
+                    <button onclick="refreshUsers()" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                        🔄 רענן
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">ID</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">אימייל</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">טלגרם</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">סטטוס</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">תוכנית</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">תוקף</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">הצטרף</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="8" class="px-6 py-4 text-center text-gray-500">טוען...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- User Details Modal -->
+    <div id="user-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-8 relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeUserModal()"
+                class="absolute top-4 left-4 text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+
+            <h2 class="text-2xl font-bold mb-6">פרטי משתמש</h2>
+
+            <div id="user-details" class="space-y-4">
+                <!-- Will be populated with user data -->
+            </div>
+
+            <div class="mt-6 flex gap-3">
+                <button onclick="extendSubscription()"
+                    class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg">
+                    הארך מנוי (+30 ימים)
+                </button>
+                <button onclick="deactivateUser()"
+                    class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg">
+                    השעה משתמש
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+
+</html>
