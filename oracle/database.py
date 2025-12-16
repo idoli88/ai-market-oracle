@@ -523,3 +523,410 @@ def update_filing_checkpoint(ticker: str, accession: str, filing_date: str, sour
             logger.info(f"Updated filing checkpoint for {ticker}: {accession}")
     except Exception as e:
         logger.error(f"Error updating filing checkpoint for {ticker}: {e}")
+
+# --- Web User Management ---
+
+def create_web_user(email: str, password_hash: str, telegram_chat_id: Optional[int] = None) -> Optional[int]:
+    """
+    Create a new web user account.
+    
+    Args:
+        email: User's email address
+        password_hash: Bcrypt hashed password
+        telegram_chat_id: Optional Telegram chat ID to link
+    
+    Returns:
+        User ID if successful, None otherwise
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO web_users (email, password_hash, telegram_chat_id)
+                VALUES (?, ?, ?)
+            """, (email, password_hash, telegram_chat_id))
+            conn.commit()
+            user_id = cursor.lastrowid
+            logger.info(f"Created web user: {email} (ID: {user_id})")
+            return user_id
+    except sqlite3.IntegrityError:
+        logger.warning(f"User already exists: {email}")
+        return None
+    except Exception as e:
+        logger.error(f"Failed to create web user {email}: {e}")
+        return None
+
+
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve user by email address.
+    
+    Args:
+        email: User's email address
+    
+    Returns:
+        User dict if found, None otherwise
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM web_users WHERE email = ?", (email,))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+    except Exception as e:
+        logger.error(f"Failed to fetch user {email}: {e}")
+    return None
+
+
+def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve user by ID.
+    
+    Args:
+        user_id: User's ID
+    
+    Returns:
+        User dict if found, None otherwise
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM web_users WHERE id = ?", (user_id,))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+    except Exception as e:
+        logger.error(f"Failed to fetch user ID {user_id}: {e}")
+    return None
+
+
+def link_telegram_to_web_user(email: str, telegram_chat_id: int) -> bool:
+    """
+    Link a Telegram account to an existing web user.
+    
+    Args:
+        email: User's email
+        telegram_chat_id: Telegram chat ID
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE web_users
+                SET telegram_chat_id = ?
+                WHERE email = ?
+            """, (telegram_chat_id, email))
+            conn.commit()
+            
+            if cursor.rowcount > 0:
+                logger.info(f"Linked Telegram {telegram_chat_id} to {email}")
+                return True
+            return False
+    except Exception as e:
+        logger.error(f"Failed to link Telegram account: {e}")
+        return False
+
+
+def update_last_login(user_id: int) -> bool:
+    """
+    Update user's last login timestamp.
+    
+    Args:
+        user_id: User's ID
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        with get_db_connection() as conn:
+            conn.execute("""
+                UPDATE web_users
+                SET last_login = ?
+                WHERE id = ?
+            """, (datetime.now(), user_id))
+            conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to update last login for user {user_id}: {e}")
+        return False
+
+
+# --- Payment Management ---
+
+def log_payment(
+    user_id: int,
+    tranzila_transaction_id: str,
+    amount: float,
+    status: str,
+    payment_method: str = "credit_card",
+    metadata: Optional[Dict] = None
+) -> Optional[int]:
+    """
+    Log a payment transaction.
+    
+    Args:
+        user_id: User's ID
+        tranzila_transaction_id: Tranzila transaction ID
+        amount: Payment amount
+        status: Payment status (pending, confirmed, failed, refunded)
+        payment_method: Payment method used
+        metadata: Additional payment metadata
+    
+    Returns:
+        Payment ID if successful, None otherwise
+    """
+    try:
+        metadata_json = json.dumps(metadata) if metadata else None
+        confirmed_at = datetime.now() if status == "confirmed" else None
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO payments 
+                (user_id, tranzila_transaction_id, amount, currency, status, payment_method, confirmed_at, metadata_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, tranzila_transaction_id, amount, "ILS", status, payment_method, confirmed_at, metadata_json))
+            conn.commit()
+            payment_id = cursor.lastrowid
+            logger.info(f"Logged payment {tranzila_transaction_id} for user {user_id}: {status}")
+            return payment_id
+    except Exception as e:
+        logger.error(f"Failed to log payment: {e}")
+        return None
+
+
+def update_payment_status(tranzila_transaction_id: str, status: str) -> bool:
+    """
+    Update payment status.
+    
+    Args:
+        tranzila_transaction_id: Tranzila transaction ID
+        status: New status
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        confirmed_at = datetime.now() if status == "confirmed" else None
+        
+        with get_db_connection() as conn:
+            conn.execute("""
+                UPDATE payments
+                SET status = ?, confirmed_at = ?
+                WHERE tranzila_transaction_id = ?
+            """, (status, confirmed_at, tranzila_transaction_id))
+            conn.commit()
+        
+        logger.info(f"Updated payment {tranzila_transaction_id} status to {status}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to update payment status: {e}")
+        return False
+
+
+def get_payment_history(user_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+    """
+    Get user's payment history.
+    
+    Args:
+        user_id: User's ID
+        limit: Maximum number of records to return
+    
+    Returns:
+        List of payment records
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM payments
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            """, (user_id, limit))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Failed to fetch payment history for user {user_id}: {e}")
+        return []
+
+
+# --- Admin Functions ---
+
+def get_all_web_users(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+    """
+    Get all web users (for admin dashboard).
+    
+    Args:
+        limit: Maximum number of users to return
+        offset: Pagination offset
+    
+    Returns:
+        List of user records
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    u.id, u.email, u.telegram_chat_id, u.created_at, u.last_login,
+                    s.is_active, s.subscription_end_date, s.plan
+                FROM web_users u
+                LEFT JOIN subscribers s ON u.telegram_chat_id = s.telegram_chat_id
+                ORDER BY u.created_at DESC
+                LIMIT ? OFFSET ?
+            """, (limit, offset))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Failed to fetch all users: {e}")
+        return []
+
+
+def get_user_count() -> int:
+    """
+    Get total number of web users.
+    
+    Returns:
+        Total user count
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM web_users")
+            return cursor.fetchone()[0]
+    except Exception as e:
+        logger.error(f"Failed to get user count: {e}")
+        return 0
+
+
+# --- Email Verification ---
+
+def create_verification_token(user_id: int) -> Optional[str]:
+    """
+    Create an email verification token for a user.
+    
+    Args:
+        user_id: User's ID
+    
+    Returns:
+        Verification token if successful, None otherwise
+    """
+    import secrets
+    
+    try:
+        # Generate secure random token
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now() + timedelta(hours=24)  # 24 hour expiry
+        
+        with get_db_connection() as conn:
+            conn.execute("""
+                INSERT INTO email_verification_tokens (user_id, token, expires_at)
+                VALUES (?, ?, ?)
+            """, (user_id, token, expires_at))
+            conn.commit()
+        
+        logger.info(f"Created verification token for user {user_id}")
+        return token
+    
+    except Exception as e:
+        logger.error(f"Failed to create verification token: {e}")
+        return None
+
+
+def verify_email_token(token: str) -> Optional[int]:
+    """
+    Verify an email token and mark user as verified.
+    
+    Args:
+        token: Verification token
+    
+    Returns:
+        User ID if successful, None otherwise
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if token exists and is valid
+            cursor.execute("""
+                SELECT user_id, expires_at, used_at
+                FROM email_verification_tokens
+                WHERE token = ?
+            """, (token,))
+            
+            row = cursor.fetchone()
+            
+            if not row:
+                logger.warning(f"Invalid verification token: {token}")
+                return None
+            
+            user_id = row["user_id"]
+            expires_at = datetime.fromisoformat(row["expires_at"]) if isinstance(row["expires_at"], str) else row["expires_at"]
+            used_at = row["used_at"]
+            
+            # Check if already used
+            if used_at:
+                logger.warning(f"Token already used: {token}")
+                return None
+            
+            # Check if expired
+            if datetime.now() > expires_at:
+                logger.warning(f"Token expired: {token}")
+                return None
+            
+            # Mark token as used
+            cursor.execute("""
+                UPDATE email_verification_tokens
+                SET used_at = ?
+                WHERE token = ?
+            """, (datetime.now(), token))
+            
+            # Mark user as verified
+            cursor.execute("""
+                UPDATE web_users
+                SET is_verified = 1
+                WHERE id = ?
+            """, (user_id,))
+            
+            conn.commit()
+            
+            logger.info(f"Email verified for user {user_id}")
+            return user_id
+    
+    except Exception as e:
+        logger.error(f"Failed to verify email token: {e}")
+        return None
+
+
+def resend_verification_email(user_id: int) -> Optional[str]:
+    """
+    Create a new verification token for resending email.
+    Invalidates any previous unused tokens.
+    
+    Args:
+        user_id: User's ID
+    
+    Returns:
+        New verification token if successful, None otherwise
+    """
+    try:
+        with get_db_connection() as conn:
+            # Invalidate old tokens (mark as used)
+            conn.execute("""
+                UPDATE email_verification_tokens
+                SET used_at = ?
+                WHERE user_id = ? AND used_at IS NULL
+            """, (datetime.now(), user_id))
+            conn.commit()
+        
+        # Create new token
+        return create_verification_token(user_id)
+    
+    except Exception as e:
+        logger.error(f"Failed to resend verification email: {e}")
+        return None

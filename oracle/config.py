@@ -9,7 +9,15 @@ class Settings(BaseSettings):
     # Application Settings
     LOG_LEVEL: str = "INFO"
     DRY_RUN: bool = False
-    DB_PATH: str = "subscribers.db"
+    
+    # Database Configuration
+    DATABASE_URL: Optional[str] = None  # PostgreSQL: postgresql://user:pass@host:5432/dbname
+    DB_PATH: str = "subscribers.db"  # SQLite fallback for development
+    
+    @property
+    def use_postgres(self) -> bool:
+        """Check if PostgreSQL should be used instead of SQLite"""
+        return self.DATABASE_URL is not None and self.DATABASE_URL.startswith("postgresql://")
 
     # LLM Models
     MODEL_BASIC: str = "gpt-4o-mini"
@@ -35,7 +43,6 @@ class Settings(BaseSettings):
     NEWS_TTL_MINUTES: int = 60
 
     # SEC EDGAR API
-    SEC_USER_AGENT: str = "AI Market Oracle/1.0 (contact@example.com)"
     FUNDAMENTALS_TTL_DAYS: int = 7
 
     COOLDOWN_HOURS: int = 4
@@ -47,10 +54,49 @@ class Settings(BaseSettings):
     # Defaults
     DEFAULT_PLAN: str = "basic"
 
+    # API & Web
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 8000
+    JWT_SECRET_KEY: str = "change-this-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRY_MINUTES: int = 60
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
+
+    # Tranzila Payment
+    TRANZILA_TERMINAL: str = ""
+    TRANZILA_API_KEY: str = ""
+    TRANZILA_WEBHOOK_SECRET: str = ""
+    PAYMENT_CURRENCY: str = "ILS"
+    SUBSCRIPTION_PRICE: int = 29
+
+    # AWS SES Email
+    AWS_SES_REGION: str = "us-east-1"
+    AWS_SES_FROM_EMAIL: str = "noreply@example.com"
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+
+    # Admin
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD_HASH: str = ""
+
+    # Security
+    RATE_LIMIT_PER_MINUTE: int = 60
+    PASSWORD_HASH_ROUNDS: int = 12
+
+    # Monitoring
+    SENTRY_DSN: Optional[str] = None
+    SENTRY_ENVIRONMENT: str = "production"
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Parse CORS origins from comma-separated string"""
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
 
 settings = Settings()

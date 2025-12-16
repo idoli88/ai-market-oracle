@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,35 +13,47 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&family=Rubik:wght@400;600&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&family=Rubik:wght@400;600&display=swap"
+        rel="stylesheet">
 
     <!-- Animations -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
 
     <style>
-        body { font-family: 'Heebo', sans-serif; }
-        .font-rubik { font-family: 'Rubik', sans-serif; }
+        body {
+            font-family: 'Heebo', sans-serif;
+        }
+
+        .font-rubik {
+            font-family: 'Rubik', sans-serif;
+        }
+
         .gradient-text {
             background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+
         .blob {
             position: absolute;
             filter: blur(40px);
             z-index: -1;
             opacity: 0.4;
         }
+
         /* Custom scrollbar for phone mockup */
         .phone-scroll::-webkit-scrollbar {
             width: 4px;
         }
+
         .phone-scroll::-webkit-scrollbar-thumb {
             background-color: #4b5563;
             border-radius: 4px;
         }
     </style>
 </head>
+
 <body class="bg-gray-50 text-gray-900 overflow-x-hidden">
 
     <!-- Navigation -->
@@ -56,9 +69,20 @@
                     <a href="#demo" class="hover:text-blue-600 transition">דוגמה</a>
                     <a href="#pricing" class="hover:text-blue-600 transition">מחיר</a>
                 </div>
-                <a href="#pricing" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 px-6 rounded-full transition shadow-lg shadow-blue-200 transform hover:scale-105">
-                    הצטרף עכשיו
-                </a>
+                <div class="flex items-center gap-3">
+                    <button id="login-btn" onclick="openLoginModal()"
+                        class="text-gray-700 hover:text-blue-600 text-sm font-medium transition hidden">
+                        התחבר
+                    </button>
+                    <a id="signup-btn" href="#pricing"
+                        class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 px-6 rounded-full transition shadow-lg shadow-blue-200 transform hover:scale-105">
+                        הצטרף עכשיו
+                    </a>
+                    <button id="dashboard-btn" onclick="openDashboard()"
+                        class="bg-gray-100 hover:bg-gray-200 text-gray-900 text-sm font-bold py-2.5 px-6 rounded-full transition hidden">
+                        הדשבורד שלי
+                    </button>
+                </div>
             </div>
         </div>
     </nav>
@@ -70,43 +94,58 @@
         <div class="blob bg-purple-200 w-80 h-80 rounded-full bottom-0 left-0 translate-y-1/3 -translate-x-1/3"></div>
 
         <div class="max-w-5xl mx-auto relative z-10">
-            <div class="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-700 px-4 py-1.5 rounded-full text-sm font-bold mb-8 shadow-sm animate__animated animate__fadeInDown">
+            <div
+                class="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-700 px-4 py-1.5 rounded-full text-sm font-bold mb-8 shadow-sm animate__animated animate__fadeInDown">
                 <span class="relative flex h-2 w-2">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                    <span
+                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                 </span>
                 חדש: מנוע GPT-4 לאנליזה טכנית
             </div>
 
-            <h1 class="text-5xl lg:text-7xl font-black mb-6 leading-tight tracking-tight text-gray-900 animate__animated animate__fadeInUp">
+            <h1
+                class="text-5xl lg:text-7xl font-black mb-6 leading-tight tracking-tight text-gray-900 animate__animated animate__fadeInUp">
                 האנליסט האישי שלך.<br>
                 <span class="gradient-text">למניות שמעניינות אותך.</span>
             </h1>
 
-            <p class="text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed animate__animated animate__fadeInUp animate__delay-1s">
-                תפסיק לנחש ולבהות בגרפים. הבוט שלנו סורק את השוק 24/7, מזהה הזדמנויות בתיק האישי שלך (NVDA, TSLA ועוד), ושולח לך שורה תחתונה ברורה לנייד.
+            <p
+                class="text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed animate__animated animate__fadeInUp animate__delay-1s">
+                תפסיק לנחש ולבהות בגרפים. הבוט שלנו סורק את השוק 24/7, מזהה הזדמנויות בתיק האישי שלך (NVDA, TSLA ועוד),
+                ושולח לך שורה תחתונה ברורה לנייד.
             </p>
 
-            <div class="flex flex-col sm:flex-row justify-center gap-4 animate__animated animate__fadeInUp animate__delay-1s">
-                <a href="#pricing" class="bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold py-4 px-10 rounded-xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition duration-300 ring-4 ring-blue-100">
+            <div
+                class="flex flex-col sm:flex-row justify-center gap-4 animate__animated animate__fadeInUp animate__delay-1s">
+                <a href="#pricing"
+                    class="bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold py-4 px-10 rounded-xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition duration-300 ring-4 ring-blue-100">
                     התחל ב-29 ₪ לחודש בלבד
                 </a>
-                <a href="#demo" class="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-lg font-bold py-4 px-10 rounded-xl transition duration-300 flex items-center justify-center gap-2 shadow-sm">
+                <a href="#demo"
+                    class="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-lg font-bold py-4 px-10 rounded-xl transition duration-300 flex items-center justify-center gap-2 shadow-sm">
                     <span>👇</span> ראה דוגמה
                 </a>
             </div>
 
-            <div class="mt-8 flex flex-wrap justify-center items-center gap-6 text-sm text-gray-500 animate__animated animate__fadeIn animate__delay-2s">
+            <div
+                class="mt-8 flex flex-wrap justify-center items-center gap-6 text-sm text-gray-500 animate__animated animate__fadeIn animate__delay-2s">
                 <div class="flex items-center gap-1">
-                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
                     ללא התחייבות
                 </div>
                 <div class="flex items-center gap-1">
-                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
                     ניתוח טכני אובייקטיבי
                 </div>
                 <div class="flex items-center gap-1">
-                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
                     ביטול בכל רגע
                 </div>
             </div>
@@ -119,36 +158,47 @@
             <div class="flex flex-col lg:flex-row items-center justify-center gap-16">
                 <!-- Text Side -->
                 <div class="lg:w-1/2 space-y-8">
-                    <h2 class="text-3xl lg:text-4xl font-bold text-gray-900 leading-tight">פחות רעש, יותר אותות.<br>בדיוק למניות שלך.</h2>
+                    <h2 class="text-3xl lg:text-4xl font-bold text-gray-900 leading-tight">פחות רעש, יותר
+                        אותות.<br>בדיוק למניות שלך.</h2>
                     <p class="text-lg text-gray-600">
-                        רוב המשקיעים מפסידים כסף כי הם פועלים מרגש או מחוסר זמן. האורקל הוא מכונה קרה ומחושבת שעובדת בשבילך.
+                        רוב המשקיעים מפסידים כסף כי הם פועלים מרגש או מחוסר זמן. האורקל הוא מכונה קרה ומחושבת שעובדת
+                        בשבילך.
                     </p>
 
                     <div class="space-y-6">
                         <!-- Feature Item 1 -->
                         <div class="flex gap-4">
-                            <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 text-xl flex-shrink-0">⚙️</div>
+                            <div
+                                class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 text-xl flex-shrink-0">
+                                ⚙️</div>
                             <div>
                                 <h3 class="font-bold text-gray-900 text-lg">אתה בוחר את התיק</h3>
-                                <p class="text-gray-500">בעת ההרשמה אתה מגדיר לבוט את המניות שמעניינות אותך (למשל: נאסד"ק, טסלה ובנק לאומי).</p>
+                                <p class="text-gray-500">בעת ההרשמה אתה מגדיר לבוט את המניות שמעניינות אותך (למשל:
+                                    נאסד"ק, טסלה ובנק לאומי).</p>
                             </div>
                         </div>
 
                         <!-- Feature Item 2 -->
                         <div class="flex gap-4">
-                            <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 text-xl flex-shrink-0">🧠</div>
+                            <div
+                                class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 text-xl flex-shrink-0">
+                                🧠</div>
                             <div>
                                 <h3 class="font-bold text-gray-900 text-lg">ניתוח AI מתקדם</h3>
-                                <p class="text-gray-500">הבוט מנתח RSI, ממוצעים נעים (EMA) ומגמות שוק, ומסנן רעשים מיותרים.</p>
+                                <p class="text-gray-500">הבוט מנתח RSI, ממוצעים נעים (EMA) ומגמות שוק, ומסנן רעשים
+                                    מיותרים.</p>
                             </div>
                         </div>
 
                         <!-- Feature Item 3 -->
                         <div class="flex gap-4">
-                            <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-green-600 text-xl flex-shrink-0">💬</div>
+                            <div
+                                class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-green-600 text-xl flex-shrink-0">
+                                💬</div>
                             <div>
                                 <h3 class="font-bold text-gray-900 text-lg">התראה בזמן אמת</h3>
-                                <p class="text-gray-500">מקבלים הודעה קצרה לוואטסאפ רק כשיש משהו חשוב. "NVDA במצב קנייה", "השוק מסוכן - שב בצד".</p>
+                                <p class="text-gray-500">מקבלים הודעה קצרה לוואטסאפ רק כשיש משהו חשוב. "NVDA במצב
+                                    קנייה", "השוק מסוכן - שב בצד".</p>
                             </div>
                         </div>
                     </div>
@@ -159,12 +209,17 @@
                     <div class="absolute inset-0 bg-blue-500/20 blur-3xl rounded-full transform rotate-6"></div>
                     <div class="relative bg-gray-900 rounded-[3rem] p-4 shadow-2xl w-80 border-4 border-gray-800">
                         <!-- Dynamic Island / Notch -->
-                        <div class="absolute top-0 left-1/2 transform -translate-x-1/2 w-24 h-6 bg-black rounded-b-2xl z-20"></div>
+                        <div
+                            class="absolute top-0 left-1/2 transform -translate-x-1/2 w-24 h-6 bg-black rounded-b-2xl z-20">
+                        </div>
 
                         <div class="bg-[#0b141a] h-[550px] rounded-[2rem] overflow-hidden flex flex-col relative">
                             <!-- WhatsApp Header -->
-                            <div class="bg-[#202c33] p-4 pt-8 flex items-center gap-3 text-white border-b border-gray-700 z-10">
-                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-lg shadow-lg">🔮</div>
+                            <div
+                                class="bg-[#202c33] p-4 pt-8 flex items-center gap-3 text-white border-b border-gray-700 z-10">
+                                <div
+                                    class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-lg shadow-lg">
+                                    🔮</div>
                                 <div>
                                     <div class="font-bold text-sm">האורקל</div>
                                     <div class="text-[10px] text-green-400 font-medium">מחובר • אנליסט אישי</div>
@@ -172,16 +227,20 @@
                             </div>
 
                             <!-- Messages -->
-                            <div class="flex-1 p-4 space-y-4 bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] opacity-90 phone-scroll overflow-y-auto">
+                            <div
+                                class="flex-1 p-4 space-y-4 bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] opacity-90 phone-scroll overflow-y-auto">
 
                                 <!-- Date -->
                                 <div class="flex justify-center mb-4">
-                                    <span class="bg-[#202c33] text-gray-400 text-[10px] px-3 py-1 rounded-full shadow-sm">היום</span>
+                                    <span
+                                        class="bg-[#202c33] text-gray-400 text-[10px] px-3 py-1 rounded-full shadow-sm">היום</span>
                                 </div>
 
                                 <!-- Bot Message -->
-                                <div class="bg-[#202c33] text-white p-3 rounded-tr-none rounded-xl rounded-tl-xl rounded-bl-xl text-xs shadow-md ml-auto max-w-[90%] border border-gray-700/50">
-                                    <p class="font-bold text-blue-300 mb-2 border-b border-gray-700 pb-1 flex justify-between">
+                                <div
+                                    class="bg-[#202c33] text-white p-3 rounded-tr-none rounded-xl rounded-tl-xl rounded-bl-xl text-xs shadow-md ml-auto max-w-[90%] border border-gray-700/50">
+                                    <p
+                                        class="font-bold text-blue-300 mb-2 border-b border-gray-700 pb-1 flex justify-between">
                                         <span>📊 סקירת נעילה יומית</span>
                                         <span>17:30</span>
                                     </p>
@@ -197,15 +256,19 @@
                                         <p>עדיין יקרה. RSI 68. המתנה.</p>
                                     </div>
 
-                                    <p class="mt-2 pt-2 border-t border-gray-600 font-bold text-green-400 flex items-center gap-1">
+                                    <p
+                                        class="mt-2 pt-2 border-t border-gray-600 font-bold text-green-400 flex items-center gap-1">
                                         💡 המלצה: שקול איסוף ב-TSLA עם סטופ צמוד ב-$215.
                                     </p>
                                 </div>
 
                                 <!-- User Message -->
-                                <div class="bg-[#005c4b] text-white p-3 rounded-tl-none rounded-xl rounded-tr-xl rounded-br-xl text-xs shadow-md mr-auto max-w-[80%]">
+                                <div
+                                    class="bg-[#005c4b] text-white p-3 rounded-tl-none rounded-xl rounded-tr-xl rounded-br-xl text-xs shadow-md mr-auto max-w-[80%]">
                                     <p>תודה! נכנסתי לטסלה 👍</p>
-                                    <span class="text-[9px] text-gray-300 block text-right mt-1 flex justify-end gap-1 items-center">17:35 <span class="text-blue-300">✓✓</span></span>
+                                    <span
+                                        class="text-[9px] text-gray-300 block text-right mt-1 flex justify-end gap-1 items-center">17:35
+                                        <span class="text-blue-300">✓✓</span></span>
                                 </div>
 
                             </div>
@@ -222,7 +285,8 @@
             <h2 class="text-4xl font-black mb-6">השקעה במחיר של שווארמה</h2>
             <p class="text-xl text-gray-600 mb-12">בלי אותיות קטנות. בלי דמי ניהול. משלמים רק על הגישה לבוט.</p>
 
-            <div class="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden max-w-sm mx-auto hover:-translate-y-2 transition duration-500 relative">
+            <div
+                class="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden max-w-sm mx-auto hover:-translate-y-2 transition duration-500 relative">
                 <div class="absolute top-0 w-full h-2 bg-gradient-to-r from-blue-500 to-purple-600"></div>
                 <div class="bg-blue-50 text-blue-800 text-xs font-bold py-2 uppercase tracking-wider">הכי משתלם</div>
 
@@ -235,26 +299,36 @@
 
                     <ul class="text-right space-y-4 mb-10 text-gray-600 text-sm">
                         <li class="flex items-center gap-3">
-                            <div class="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-xs">✓</div>
+                            <div
+                                class="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-xs">
+                                ✓</div>
                             <span>עד 5 מניות למעקב אישי לבחירתך</span>
                         </li>
                         <li class="flex items-center gap-3">
-                            <div class="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-xs">✓</div>
+                            <div
+                                class="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-xs">
+                                ✓</div>
                             <span>3 עדכונים ביום (פתיחה, אמצע, סגירה)</span>
                         </li>
                         <li class="flex items-center gap-3">
-                            <div class="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-xs">✓</div>
+                            <div
+                                class="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-xs">
+                                ✓</div>
                             <span>גישה לניתוחי AI בזמן אמת</span>
                         </li>
                         <li class="flex items-center gap-3">
-                            <div class="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-xs">✓</div>
+                            <div
+                                class="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-xs">
+                                ✓</div>
                             <span>ביטול בכל רגע ללא שאלות</span>
                         </li>
                     </ul>
 
                     <!-- Payment Button -->
                     <!-- שנה את המספר 972501234567 למספר שלך -->
-                    <a href="https://wa.me/972501234567?text=היי,%20אני%20רוצה%20להצטרף%20לאורקל%20במנוי%20חודשי!%20המניות%20שלי:%20" target="_blank" class="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition shadow-lg hover:shadow-blue-500/40 mb-4 group">
+                    <a href="https://wa.me/972501234567?text=היי,%20אני%20רוצה%20להצטרף%20לאורקל%20במנוי%20חודשי!%20המניות%20שלי:%20"
+                        target="_blank"
+                        class="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition shadow-lg hover:shadow-blue-500/40 mb-4 group">
                         אני רוצה להצטרף 🔥
                         <span class="inline-block transition-transform group-hover:translate-x-1 duration-200">←</span>
                     </a>
@@ -269,28 +343,36 @@
         <div class="max-w-3xl mx-auto px-4">
             <h2 class="text-3xl font-bold text-center mb-12">שאלות נפוצות</h2>
             <div class="space-y-4">
-                <details class="bg-gray-50 p-6 rounded-xl cursor-pointer group hover:bg-blue-50 transition border border-gray-100">
+                <details
+                    class="bg-gray-50 p-6 rounded-xl cursor-pointer group hover:bg-blue-50 transition border border-gray-100">
                     <summary class="font-bold flex justify-between items-center list-none text-lg">
                         האם זה ייעוץ השקעות?
                         <span class="transform group-open:rotate-180 transition text-blue-600">▼</span>
                     </summary>
-                    <p class="text-gray-600 mt-4 leading-relaxed pr-4 border-r-2 border-blue-200 mr-2">לא. האורקל הוא כלי טכנולוגי לניתוח מידע. הוא מציג נתונים טכניים (RSI, ממוצעים) ומעבד אותם בצורה פשוטה. אנחנו לא יועצים מורשים, והאחריות על הפעולות בתיק היא שלך בלבד.</p>
+                    <p class="text-gray-600 mt-4 leading-relaxed pr-4 border-r-2 border-blue-200 mr-2">לא. האורקל הוא
+                        כלי טכנולוגי לניתוח מידע. הוא מציג נתונים טכניים (RSI, ממוצעים) ומעבד אותם בצורה פשוטה. אנחנו לא
+                        יועצים מורשים, והאחריות על הפעולות בתיק היא שלך בלבד.</p>
                 </details>
 
-                <details class="bg-gray-50 p-6 rounded-xl cursor-pointer group hover:bg-blue-50 transition border border-gray-100">
+                <details
+                    class="bg-gray-50 p-6 rounded-xl cursor-pointer group hover:bg-blue-50 transition border border-gray-100">
                     <summary class="font-bold flex justify-between items-center list-none text-lg">
                         איך בוחרים את המניות למעקב?
                         <span class="transform group-open:rotate-180 transition text-blue-600">▼</span>
                     </summary>
-                    <p class="text-gray-600 mt-4 leading-relaxed pr-4 border-r-2 border-blue-200 mr-2">פשוט מאוד. אחרי הלחיצה על כפתור ההצטרפות, נפתח צ'אט בוואטסאפ. אתה כותב לנו את רשימת המניות (למשל: "אפל, טסלה, ובנק לאומי") ואנחנו מגדירים את הבוט עבורך.</p>
+                    <p class="text-gray-600 mt-4 leading-relaxed pr-4 border-r-2 border-blue-200 mr-2">פשוט מאוד. אחרי
+                        הלחיצה על כפתור ההצטרפות, נפתח צ'אט בוואטסאפ. אתה כותב לנו את רשימת המניות (למשל: "אפל, טסלה,
+                        ובנק לאומי") ואנחנו מגדירים את הבוט עבורך.</p>
                 </details>
 
-                <details class="bg-gray-50 p-6 rounded-xl cursor-pointer group hover:bg-blue-50 transition border border-gray-100">
+                <details
+                    class="bg-gray-50 p-6 rounded-xl cursor-pointer group hover:bg-blue-50 transition border border-gray-100">
                     <summary class="font-bold flex justify-between items-center list-none text-lg">
                         איך מבטלים?
                         <span class="transform group-open:rotate-180 transition text-blue-600">▼</span>
                     </summary>
-                    <p class="text-gray-600 mt-4 leading-relaxed pr-4 border-r-2 border-blue-200 mr-2">בלי בירוקרטיה. שולחים הודעת "בטל מנוי" בוואטסאפ, ואנחנו מפסיקים את החיוב מהחודש הבא. פשוט.</p>
+                    <p class="text-gray-600 mt-4 leading-relaxed pr-4 border-r-2 border-blue-200 mr-2">בלי בירוקרטיה.
+                        שולחים הודעת "בטל מנוי" בוואטסאפ, ואנחנו מפסיקים את החיוב מהחודש הבא. פשוט.</p>
                 </details>
             </div>
         </div>
@@ -305,11 +387,171 @@
             </div>
             <p class="mb-4">הכלי החכם למשקיע העצמאי.</p>
             <p class="text-xs text-gray-500 max-w-2xl mx-auto leading-relaxed">
-                ט.ל.ח. השירות מבוסס על בינה מלאכותית ועשוי להכיל טעויות. אין לראות במידע משום המלצה לביצוע פעולות בניירות ערך. השירות אינו מהווה תחליף לייעוץ השקעות המתחשב בנתונים ובצרכים המיוחדים של כל אדם.
+                ט.ל.ח. השירות מבוסס על בינה מלאכותית ועשוי להכיל טעויות. אין לראות במידע משום המלצה לביצוע פעולות
+                בניירות ערך. השירות אינו מהווה תחליף לייעוץ השקעות המתחשב בנתונים ובצרכים המיוחדים של כל אדם.
             </p>
             <p class="mt-8 text-gray-600">© 2025 האורקל. כל הזכויות שמורות.</p>
         </div>
     </footer>
 
+    <!-- Signup Modal -->
+    <div id="signup-modal"
+        class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-8 relative animate__animated animate__fadeInUp">
+            <button onclick="closeSignupModal()"
+                class="absolute top-4 left-4 text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+
+            <h2 class="text-2xl font-bold mb-2 text-center">הצטרפות לאורקל</h2>
+            <p class="text-gray-600 text-center mb-6">התחל לקבל ניתוחי שוק מותאמים אישית</p>
+
+            <form onsubmit="handleSignup(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">אימייל</label>
+                    <input type="email" id="signup-email" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="your@email.com">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">סיסמה (לפחות 8 תווים)</label>
+                    <input type="password" id="signup-password" required minlength="8"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="••••••••">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">מניות למעקב (אופציונלי, עד 5)</label>
+                    <input type="text" id="signup-tickers"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="NVDA, TSLA, QQQ">
+                    <p class="text-xs text-gray-500 mt-1">הפרד בפסיק. תוכל להוסיף מאוחר יותר.</p>
+                </div>
+
+                <button type="submit"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">
+                    הירשם והמשך לתשלום
+                </button>
+            </form>
+
+            <p class="text-center text-sm text-gray-600 mt-4">
+                כבר יש לך חשבון?
+                <button onclick="closeSignupModal(); openLoginModal();"
+                    class="text-blue-600 hover:underline font-medium">התחבר</button>
+            </p>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-8 relative animate__animated animate__fadeInUp">
+            <button onclick="closeLoginModal()"
+                class="absolute top-4 left-4 text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+
+            <h2 class="text-2xl font-bold mb-2 text-center">התחברות</h2>
+            <p class="text-gray-600 text-center mb-6">ברוך שובך!</p>
+
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">אימייל</label>
+                    <input type="email" id="login-email" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="your@email.com">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">סיסמה</label>
+                    <input type="password" id="login-password" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="••••••••">
+                </div>
+
+                <button type="submit"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">
+                    התחבר
+                </button>
+            </form>
+
+            <p class="text-center text-sm text-gray-600 mt-4">
+                אין לך חשבון?
+                <button onclick="closeLoginModal(); openSignupModal();"
+                    class="text-blue-600 hover:underline font-medium">הירשם</button>
+            </p>
+        </div>
+    </div>
+
+    <!-- User Dashboard Modal -->
+    <div id="dashboard-modal"
+        class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl max-w-3xl w-full p-8 relative animate__animated animate__fadeInUp my-8">
+            <button onclick="closeDashboard()"
+                class="absolute top-4 left-4 text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+
+            <h2 class="text-2xl font-bold mb-6 text-center">הדשבורד שלי</h2>
+
+            <!-- Subscription Info -->
+            <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
+                <h3 class="font-bold text-lg mb-3">מצב המנוי</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-600">סטטוס</p>
+                        <p id="subscription-status" class="font-bold text-lg">טוען...</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">תוכנית</p>
+                        <p id="subscription-plan" class="font-bold">טוען...</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">תוקף עד</p>
+                        <p id="subscription-expiry" class="font-bold">טוען...</p>
+                    </div>
+                    <div>
+                        <button onclick="handleCancelSubscription()"
+                            class="text-sm text-red-600 hover:text-red-800 underline">
+                            ביטול מנוי
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Portfolio Management -->
+            <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                <h3 class="font-bold text-lg mb-3">התיק שלי</h3>
+                <ul id="portfolio-list" class="space-y-2 mb-4">
+                    <li class="text-gray-500 text-center py-4">טוען...</li>
+                </ul>
+
+                <form onsubmit="handleAddTicker(event)" class="flex gap-2">
+                    <input type="text" id="new-ticker" placeholder="הוסף מניה (למשל: AAPL)"
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <button type="submit"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded-lg transition">
+                        הוסף
+                    </button>
+                </form>
+                <p class="text-xs text-gray-500 mt-2">מקסימום 6 מניות</p>
+            </div>
+
+            <!-- Telegram Integration -->
+            <div class="bg-blue-50 rounded-xl p-6 border border-blue-200">
+                <h3 class="font-bold text-lg mb-2">חבר את הטלגרם שלך</h3>
+                <p class="text-sm text-gray-600 mb-3">כדי לקבל עדכונים, פתח את הבוט בטלגרם ושלח:</p>
+                <code class="block bg-white px-4 py-2 rounded border text-center font-mono">/start</code>
+                <a href="https://t.me/YOUR_BOT_USERNAME" target="_blank"
+                    class="mt-3 block text-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition">
+                    פתח בטלגרם
+                </a>
+            </div>
+
+            <button onclick="logout(); closeDashboard();"
+                class="mt-6 w-full text-gray-600 hover:text-gray-900 font-medium py-2 transition">
+                התנתק
+            </button>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="app.js"></script>
+
 </body>
+
 </html>
