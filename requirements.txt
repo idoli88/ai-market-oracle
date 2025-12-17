@@ -5,6 +5,7 @@ openai
 python-dotenv
 requests
 pydantic-settings
+email-validator
 pytest
 pytest-mock
 tenacity
@@ -38,4 +39,3 @@ psycopg2-binary==2.9.9
 
 # Monitoring & Error Tracking
 sentry-sdk[fastapi]==1.40.0
-

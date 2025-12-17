@@ -1,14 +1,22 @@
 import sqlite3
 import json
 import logging
+import os
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Set, Any, Tuple
-from contextlib import contextmanager
+
+try:
+    import psycopg2
+    import psycopg2.extras
+except ImportError:
+    psycopg2 = None
 
 from oracle.logger import setup_logger
 from oracle.config import settings
 from oracle.db_models import (
     ALL_TABLES,
+    ALL_TABLE_NAMES,
     CREATE_SUBSCRIBERS_TABLE,
     CREATE_USER_PORTFOLIOS_TABLE,
     CREATE_TICKER_SNAPSHOTS_TABLE,
@@ -18,20 +26,138 @@ from oracle.db_models import (
 
 logger = setup_logger(__name__)
 
+def _prepare_sql(query: str) -> str:
+    """
+    Convert SQLite-style placeholders to PostgreSQL placeholders when needed.
+    """
+    if settings.use_postgres:
+        return query.replace("?", "%s")
+    return query
+
+
+def _translate_schema(sql: str) -> str:
+    """
+    Translate SQLite DDL to be PostgreSQL-compatible.
+    Minimal conversion for current schemas.
+    """
+    if not settings.use_postgres:
+        return sql
+    translated = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+    translated = translated.replace("AUTOINCREMENT", "")
+    return translated
+
+
+class PostgresCursor:
+    """Minimal cursor wrapper to mimic sqlite3 interface."""
+
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def execute(self, query: str, params: Optional[tuple] = None):
+        self._cursor.execute(_prepare_sql(query), params or [])
+
+    def executemany(self, query: str, seq_of_params):
+        self._cursor.executemany(_prepare_sql(query), seq_of_params)
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    @property
+    def rowcount(self):
+        return self._cursor.rowcount
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._cursor.close()
+
+
+class PostgresConnection:
+    """Connection wrapper providing sqlite-like API for postgres backends."""
+
+    def __init__(self, conn):
+        self._conn = conn
+        self._row_factory = None  # for compatibility
+
+    # Compatibility with sqlite interface
+    @property
+    def row_factory(self):
+        return self._row_factory
+
+    @row_factory.setter
+    def row_factory(self, value):
+        # Ignored for postgres; RealDictCursor already provides dict-like rows
+        self._row_factory = value
+
+    def cursor(self):
+        return PostgresCursor(self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor))
+
+    def execute(self, query: str, params: Optional[tuple] = None):
+        with self.cursor() as cursor:
+            cursor.execute(query, params)
+            try:
+                rows = cursor.fetchall()
+            except psycopg2.ProgrammingError:
+                rows = None
+            self._conn.commit()
+            return rows
+
+    def executemany(self, query: str, seq_of_params):
+        with self.cursor() as cursor:
+            cursor.executemany(query, seq_of_params)
+            self._conn.commit()
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        self._conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type:
+            self.rollback()
+        else:
+            self.commit()
+        self.close()
+
+
 @contextmanager
 def get_db_connection():
     """Context manager for database connections."""
-    conn = sqlite3.connect(settings.DB_PATH)
-    conn.row_factory = sqlite3.Row # Enable access by column name
-    try:
-        yield conn
-    finally:
-        conn.close()
+    if settings.use_postgres:
+        if psycopg2 is None:
+            raise RuntimeError("psycopg2 is required for PostgreSQL connections. Install requirements.txt.")
+        conn = psycopg2.connect(settings.DATABASE_URL)
+        wrapped = PostgresConnection(conn)
+        try:
+            yield wrapped
+        finally:
+            wrapped.close()
+    else:
+        conn = sqlite3.connect(settings.DB_PATH)
+        conn.row_factory = sqlite3.Row  # Enable access by column name
+        try:
+            yield conn
+        finally:
+            conn.close()
 
 # --- Subscriber Management ---
 
 def migrate_db():
     """Check for missing columns and add them (SQLite migration)."""
+    if settings.use_postgres:
+        logger.info("Skipping SQLite migrations (use Alembic or SQL migrations for Postgres).")
+        return
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -69,7 +195,7 @@ def init_db():
         with get_db_connection() as conn:
             cursor = conn.cursor()
             for table_schema in ALL_TABLES:
-                cursor.execute(table_schema)
+                cursor.execute(_translate_schema(table_schema))
             conn.commit()
 
         # Run migrations
@@ -78,6 +204,148 @@ def init_db():
         logger.info("Database initialized successfully.")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
+        raise
+
+# --- Sessions (JWT revocation) ---
+
+def create_session(user_id: int, token_hash: str, expires_at: datetime) -> bool:
+    """Persist a session record for token revocation."""
+    try:
+        with get_db_connection() as conn:
+            conn.execute("""
+                INSERT INTO sessions (user_id, token_hash, expires_at)
+                VALUES (?, ?, ?)
+            """, (user_id, token_hash, expires_at))
+            conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to create session for user {user_id}: {e}")
+        return False
+
+
+def deactivate_session_by_hash(token_hash: str) -> bool:
+    """Deactivate a session using its token hash."""
+    try:
+        with get_db_connection() as conn:
+            conn.execute("""
+                UPDATE sessions
+                SET is_active = 0
+                WHERE token_hash = ?
+            """, (token_hash,))
+            conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to deactivate session: {e}")
+        return False
+
+
+def is_session_active(token_hash: str) -> bool:
+    """Check if a session is active and not expired; auto-deactivate expired ones."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT is_active, expires_at FROM sessions
+                WHERE token_hash = ?
+            """, (token_hash,))
+            row = cursor.fetchone()
+            if not row:
+                return False
+            is_active = row["is_active"] if isinstance(row, dict) else row[0]
+            expires_at = row["expires_at"] if isinstance(row, dict) else row[1]
+            if not is_active:
+                return False
+            if expires_at and datetime.fromisoformat(str(expires_at)) < datetime.utcnow():
+                conn.execute("""
+                    UPDATE sessions SET is_active = 0 WHERE token_hash = ?
+                """, (token_hash,))
+                conn.commit()
+                return False
+            return True
+    except Exception as e:
+        logger.error(f"Failed to check session: {e}")
+        return False
+
+
+def purge_expired_sessions(retention_days: int = settings.SESSION_RETENTION_DAYS) -> int:
+    """Delete expired or inactive sessions older than retention window."""
+    try:
+        cutoff = datetime.utcnow() - timedelta(days=retention_days)
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                DELETE FROM sessions
+                WHERE (expires_at < ? OR is_active = 0) AND created_at < ?
+            """, (datetime.utcnow(), cutoff))
+            deleted = cursor.rowcount
+            conn.commit()
+            if deleted:
+                logger.info(f"Purged {deleted} old sessions")
+            return deleted
+    except Exception as e:
+        logger.error(f"Failed to purge sessions: {e}")
+        return 0
+
+
+def prune_news_cache(retention_days: int = settings.NEWS_RETENTION_DAYS) -> int:
+    """Remove news_cache rows older than retention_days."""
+    try:
+        cutoff = datetime.utcnow() - timedelta(days=retention_days)
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM news_cache WHERE fetched_at < ?", (cutoff,))
+            deleted = cursor.rowcount
+            conn.commit()
+            if deleted:
+                logger.info(f"Pruned {deleted} news_cache rows")
+            return deleted
+    except Exception as e:
+        logger.error(f"Failed to prune news cache: {e}")
+        return 0
+
+
+def prune_fundamentals_cache(retention_days: int = settings.FUNDAMENTALS_RETENTION_DAYS) -> int:
+    """Remove fundamentals cache rows older than retention_days."""
+    try:
+        cutoff = datetime.utcnow() - timedelta(days=retention_days)
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM fundamentals_cache WHERE last_updated < ?", (cutoff,))
+            deleted = cursor.rowcount
+            conn.commit()
+            if deleted:
+                logger.info(f"Pruned {deleted} fundamentals_cache rows")
+            return deleted
+    except Exception as e:
+        logger.error(f"Failed to prune fundamentals cache: {e}")
+        return 0
+
+
+def run_maintenance():
+    """Run lightweight DB maintenance for caches and sessions."""
+    prune_news_cache()
+    prune_fundamentals_cache()
+    purge_expired_sessions()
+
+def reset_database():
+    """
+    Reset database state (used in tests).
+    Removes the SQLite file and recreates schema, or truncates Postgres tables.
+    """
+    try:
+        if settings.use_postgres:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                for table in ALL_TABLE_NAMES:
+                    cursor.execute(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE")
+                conn.commit()
+        else:
+            if os.path.exists(settings.DB_PATH):
+                os.remove(settings.DB_PATH)
+            init_db()
+        logger.info("Database reset successfully.")
+    except Exception as e:
+        logger.error(f"Failed to reset database: {e}")
         raise
 
 def add_subscriber(chat_id: int, days: int = 30, plan: str = "basic", notification_pref: str = "standard") -> bool:

@@ -1,26 +1,55 @@
 """
 Pydantic schemas for API request/response validation.
 """
-from pydantic import BaseModel, EmailStr, Field, validator
-from typing import Optional, List
+import re
 from datetime import datetime
+from typing import Optional, List
+
+from pydantic import BaseModel, Field, field_validator
+
+try:
+    from email_validator import validate_email as _validate_email_external, EmailNotValidError
+except ImportError:
+    _validate_email_external = None
+    EmailNotValidError = Exception
+
+EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _validate_email(value: str) -> str:
+    """Email validation with optional dependency, fallback to regex."""
+    if _validate_email_external:
+        try:
+            return _validate_email_external(value).email
+        except EmailNotValidError as exc:
+            raise ValueError(str(exc)) from exc
+    if not value or not EMAIL_REGEX.fullmatch(value):
+        raise ValueError("Invalid email address")
+    return value.strip().lower()
 
 
 # --- Authentication Schemas ---
 
 class UserSignup(BaseModel):
     """User signup request"""
-    email: EmailStr
+    email: str
     password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
-    tickers: Optional[List[str]] = Field(default=[], max_items=5, description="Initial tickers (max 5)")
+    tickers: Optional[List[str]] = Field(default_factory=list, max_length=5, description="Initial tickers (max 5)")
     
-    @validator('password')
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v):
+        return _validate_email(v)
+    
+    @field_validator('password')
+    @classmethod
     def password_strength(cls, v):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters')
         return v
     
-    @validator('tickers')
+    @field_validator('tickers')
+    @classmethod
     def validate_tickers(cls, v):
         if v:
             return [ticker.upper().strip() for ticker in v]
@@ -29,8 +58,13 @@ class UserSignup(BaseModel):
 
 class UserLogin(BaseModel):
     """User login request"""
-    email: EmailStr
+    email: str
     password: str
+    
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v):
+        return _validate_email(v)
 
 
 class TokenResponse(BaseModel):
@@ -71,7 +105,8 @@ class AddTicker(BaseModel):
     """Add ticker to portfolio"""
     ticker: str = Field(..., min_length=1, max_length=10)
     
-    @validator('ticker')
+    @field_validator('ticker')
+    @classmethod
     def uppercase_ticker(cls, v):
         return v.upper().strip()
 
@@ -92,6 +127,11 @@ class PaymentWebhook(BaseModel):
     currency: str = "ILS"
     user_email: str
     signature: str  # For verification
+    
+    @field_validator('user_email')
+    @classmethod
+    def validate_user_email(cls, v):
+        return _validate_email(v)
 
 
 class InvoiceItem(BaseModel):

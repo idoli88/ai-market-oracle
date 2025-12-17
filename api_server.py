@@ -12,6 +12,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from typing import Optional, List
 from datetime import datetime, timedelta
+from contextlib import asynccontextmanager
 
 from oracle.config import settings
 from oracle import database, auth
@@ -52,17 +53,23 @@ if settings.SENTRY_DSN:
 else:
     logger.warning("Sentry not configured - error tracking disabled")
 
+# Lifespan events
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting API server...")
+    database.init_db()
+    auth.check_security_settings()
+    database.run_maintenance()
+    yield
+    logger.info("API server shutdown complete.")
+
 # Initialize FastAPI app
 app = FastAPI(
     title="AI Market Oracle API",
     description="REST API for Oracle subscription and portfolio management",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
-
-# Rate limiting
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware
 app.add_middleware(
@@ -101,6 +108,17 @@ app.add_middleware(SecurityHeadersMiddleware)
 # HTTP Bearer security
 security = HTTPBearer()
 
+# Rate limiting (respect X-Forwarded-For so tests/frontends can send client IP)
+def get_client_ip(request: Request):
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return get_remote_address(request)
+
+limiter = Limiter(key_func=get_client_ip)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 
 # --- Dependency Functions ---
 
@@ -116,6 +134,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token"
+        )
+
+    token_hash = auth.token_hash(token)
+    if not database.is_session_active(token_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired or revoked"
         )
     
     user = database.get_user_by_id(user_id)
@@ -170,7 +195,7 @@ async def health_check():
 
 @app.post("/api/auth/signup", response_model=TokenResponse)
 @limiter.limit("3/hour")  # Prevent bot signups
-async def signup(request, signup_data: UserSignup):
+async def signup(request: Request, signup_data: UserSignup):
     """
     Create a new user account and send verification email.
     """
@@ -213,7 +238,9 @@ async def signup(request, signup_data: UserSignup):
         )
         
         # Create JWT token (but user can't do much until verified)
-        token = auth.create_access_token({"sub": user_id})
+        expires_at = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRY_MINUTES)
+        token = auth.create_access_token({"sub": user_id}, expires_delta=timedelta(minutes=settings.JWT_EXPIRY_MINUTES))
+        database.create_session(user_id, auth.token_hash(token), expires_at)
         
         logger.info(f"User registered (pending verification): {signup_data.email}")
         
@@ -311,7 +338,7 @@ async def resend_verification(current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/auth/login", response_model=TokenResponse)
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
-async def login(request, login_data: UserLogin):
+async def login(request: Request, login_data: UserLogin):
     """
     Authenticate user and return JWT token.
     """
@@ -334,8 +361,10 @@ async def login(request, login_data: UserLogin):
         # Update last login
         database.update_last_login(user["id"])
         
-        # Create JWT token
-        token = auth.create_access_token({"sub": user["id"]})
+        # Create JWT token + session
+        expires_delta = timedelta(minutes=settings.JWT_EXPIRY_MINUTES)
+        token = auth.create_access_token({"sub": user["id"]}, expires_delta=expires_delta)
+        database.create_session(user["id"], auth.token_hash(token), datetime.utcnow() + expires_delta)
         
         logger.info(f"User logged in: {login_data.email}")
         
@@ -366,6 +395,17 @@ async def get_profile(current_user: dict = Depends(get_current_user)):
         created_at=current_user["created_at"],
         last_login=current_user.get("last_login")
     )
+
+
+@app.post("/api/auth/logout", response_model=MessageResponse)
+async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Revoke current JWT token.
+    """
+    token = credentials.credentials
+    token_hash = auth.token_hash(token)
+    database.deactivate_session_by_hash(token_hash)
+    return MessageResponse(message="Logged out", success=True)
 
 
 # --- Subscription Endpoints ---
@@ -620,10 +660,15 @@ async def tranzila_webhook(payload: dict):
 
 @app.post("/api/admin/auth", response_model=TokenResponse)
 @limiter.limit("10/minute")
-async def admin_login(request, login_data: AdminLogin):
+async def admin_login(request: Request, login_data: AdminLogin):
     """
     Admin authentication.
     """
+    if not settings.ADMIN_PASSWORD_HASH:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Admin password not configured"
+        )
     if not auth.verify_admin_password(login_data.username, login_data.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -631,7 +676,8 @@ async def admin_login(request, login_data: AdminLogin):
         )
     
     # Create admin token
-    token = auth.create_access_token({"sub": "admin", "role": "admin"})
+    admin_expiry = timedelta(minutes=settings.ADMIN_JWT_EXPIRY_MINUTES)
+    token = auth.create_access_token({"sub": "admin", "role": "admin"}, expires_delta=admin_expiry)
     
     logger.info("Admin logged in")
     
@@ -695,15 +741,6 @@ async def get_analytics(_: bool = Depends(verify_admin)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve analytics"
         )
-
-
-# Initialize database on startup
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database and run migrations"""
-    logger.info("Starting API server...")
-    database.init_db()
-    logger.info("Database initialized")
 
 
 if __name__ == "__main__":

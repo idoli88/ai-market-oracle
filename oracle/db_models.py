@@ -164,3 +164,18 @@ ALL_TABLES = [
     CREATE_API_KEYS_TABLE,
     CREATE_EMAIL_VERIFICATION_TABLE,
 ]
+
+# Table names helper (keep in sync with ALL_TABLES definitions order)
+ALL_TABLE_NAMES = [
+    "subscribers",
+    "user_portfolios",
+    "ticker_snapshots",
+    "fundamentals_cache",
+    "news_cache",
+    "filings_checkpoint",
+    "web_users",
+    "payments",
+    "sessions",
+    "api_keys",
+    "email_verification_tokens",
+]

@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     EMA_LONG: int = 200
     NEWS_CACHE_MINUTES: int = 60
 
+    # Data retention (cleanup)
+    NEWS_RETENTION_DAYS: int = 30
+    FUNDAMENTALS_RETENTION_DAYS: int = 30
+    SESSION_RETENTION_DAYS: int = 30
+
     # Defaults
     DEFAULT_PLAN: str = "basic"
 
@@ -78,10 +83,12 @@ class Settings(BaseSettings):
     # Admin
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD_HASH: str = ""
+    ADMIN_JWT_EXPIRY_MINUTES: int = 30
 
     # Security
     RATE_LIMIT_PER_MINUTE: int = 60
     PASSWORD_HASH_ROUNDS: int = 12
+    PASSWORD_HASH_SCHEME: str = "bcrypt"
 
     # Monitoring
     SENTRY_DSN: Optional[str] = None

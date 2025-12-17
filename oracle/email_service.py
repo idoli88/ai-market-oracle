@@ -18,13 +18,23 @@ class EmailService:
     """
     
     def __init__(self):
-        self.client = boto3.client(
-            'ses',
-            region_name=settings.AWS_SES_REGION,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
-        )
+        self.enabled = all([
+            settings.AWS_ACCESS_KEY_ID,
+            settings.AWS_SECRET_ACCESS_KEY,
+            not settings.DRY_RUN
+        ])
         self.from_email = settings.AWS_SES_FROM_EMAIL
+        self.client = None
+        
+        if self.enabled:
+            self.client = boto3.client(
+                'ses',
+                region_name=settings.AWS_SES_REGION,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+            )
+        else:
+            logger.info("Email service disabled (missing AWS credentials or DRY_RUN enabled)")
     
     async def send_payment_confirmation(
         self,
@@ -348,6 +358,9 @@ class EmailService:
         Returns:
             True if sent successfully, False otherwise
         """
+        if not self.client:
+            logger.debug("Email client disabled, skipping outbound email.")
+            return True
         try:
             response = self.client.send_email(
                 Source=self.from_email,

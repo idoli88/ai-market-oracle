@@ -73,9 +73,17 @@ cp .env.template .env
 # - OPENAI_API_KEY
 # - TELEGRAM_BOT_TOKEN
 # - JWT_SECRET_KEY (generate with: openssl rand -base64 64)
+# - PASSWORD_HASH_SCHEME (optional, defaults to bcrypt — set to plaintext for local testing only)
 # - TRANZILA_TERMINAL, TRANZILA_API_KEY
 # - AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+# - DATABASE_URL (PostgreSQL, preferred for production)
 ```
+
+### PostgreSQL (recommended for production)
+1) Set `DATABASE_URL=postgresql://user:pass@host:5432/dbname` in `.env`  
+2) Install dependencies: `pip install -r requirements.txt` (includes `psycopg2-binary`)  
+3) Initialize schema: `python3 -c "from oracle.database import init_db; init_db()"`  
+4) (Optional) migrate existing SQLite data with `python3 migrate_to_postgres.py`
 
 ### 3. **Initialize Database**
 ```bash
@@ -155,11 +163,19 @@ Access: http://localhost:8000/admin-dashboard/index.html
 ```bash
 pytest tests/ -v
 ```
+> Tests automatically run against a temporary SQLite database (via `DB_PATH`) so each run has isolated data. For faster local runs you can export `PASSWORD_HASH_SCHEME=plaintext` before running pytest (never do this in production).
 
 ### Run API Integration Tests
 ```bash
 pytest tests/test_api_integration.py -v
 ```
+
+## 🧹 Data Lifecycle & Backups
+
+- **Automatic cleanup**: At API startup we prune old sessions, fundamentals cache, and news cache using retention values (`SESSION_RETENTION_DAYS`, `FUNDAMENTALS_RETENTION_DAYS`, `NEWS_RETENTION_DAYS`).
+- **Manual maintenance**: Call `database.run_maintenance()` (e.g., daily cron) if the API isn’t restarted frequently.
+- **SQLite backup** (dev): `python3 - <<'PY'\nimport shutil; shutil.copyfile('subscribers.db', 'subscribers.db.bak')\nPY`
+- **PostgreSQL backup** (prod): `pg_dump $DATABASE_URL > backup.sql` (or use managed backups on your cloud provider).
 
 ### Manual API Testing
 ```bash
