@@ -1,57 +1,59 @@
-import pandas as pd
 import pytest
-from oracle.analysis import TechnicalAnalyst
+from datetime import datetime, timedelta
+from oracle.analysis import AnalysisGate
+from oracle.config import settings
 
 @pytest.fixture
-def sample_data():
-    # Create a dummy DataFrame suitable for technical analysis
-    dates = pd.date_range(start="2024-01-01", periods=100)
-    data = {
-        'Close': [100 + i for i in range(100)],
-        'High': [105 + i for i in range(100)],
-        'Low': [95 + i for i in range(100)],
-        'Open': [100 + i for i in range(100)],
-        'Volume': [1000 for _ in range(100)]
+def mock_snapshot():
+    return {
+        "last_price": 100.0,
+        "last_rsi": 50.0,
+        "last_ema_short": 100.0,
+        "last_ema_long": 90.0,
+        "last_run_at": (datetime.now() - timedelta(hours=2)).isoformat(),
+        "last_trigger_at": (datetime.now() - timedelta(hours=24)).isoformat() # > cooldown
     }
-    df = pd.DataFrame(data, index=dates)
-    return {'TEST_TICKER': df}
 
-def test_process_adds_indicators(sample_data):
-    analyst = TechnicalAnalyst()
-    processed = analyst.process(sample_data)
+def test_gate_first_run():
+    # No snapshot -> Should trigger
+    should_run, reason = AnalysisGate.should_trigger_llm("TEST", {}, None)
+    assert should_run
+    assert reason == "FIRST_RUN"
 
-    assert 'TEST_TICKER' in processed
-    df = processed['TEST_TICKER']
+def test_gate_cooldown(mock_snapshot):
+    # Update last_trigger_at to now -> Cooldown active
+    mock_snapshot["last_trigger_at"] = datetime.now()
+    should_run, reason = AnalysisGate.should_trigger_llm("TEST", {}, mock_snapshot)
+    assert not should_run
 
-    assert 'RSI' in df.columns
-    assert 'EMA_50' in df.columns
-    assert 'EMA_200' in df.columns
+def test_gate_price_change(mock_snapshot):
+    # Price change > threshold
+    current_data = {
+        "current_price": 110.0, # 10% change
+        "rsi": 50,
+        "volume_sma": 1000,
+        "current_volume": 1000,
+        "ema_short": 105,
+        "ema_long": 95
+    }
+    # Ensure cooldown passed
+    mock_snapshot["last_trigger_at"] = (datetime.now() - timedelta(hours=24))
 
-def test_process_skips_insufficient_data():
-    analyst = TechnicalAnalyst()
-    # Create small dataframe
-    df = pd.DataFrame({'Close': range(10)})
-    data = {'SMALL': df}
+    should_run, reason = AnalysisGate.should_trigger_llm("TEST", current_data, mock_snapshot)
+    assert should_run
+    assert "Price Change" in reason
 
-    processed = analyst.process(data)
-    assert 'SMALL' not in processed
+def test_gate_no_change(mock_snapshot):
+    # No significant change
+    current_data = {
+        "current_price": 100.0,
+        "rsi": 50,
+        "volume_sma": 1000,
+        "current_volume": 1000,
+        "ema_short": 100,
+        "ema_long": 90
+    }
+    mock_snapshot["last_trigger_at"] = (datetime.now() - timedelta(days=2))
 
-def test_process_handles_case_insensitive_columns():
-    analyst = TechnicalAnalyst()
-    dates = pd.date_range(start="2024-01-01", periods=100)
-    df = pd.DataFrame({'close': range(100)}, index=dates)
-    data = {'LOWERCASE': df}
-
-    processed = analyst.process(data)
-    assert 'LOWERCASE' in processed
-    assert 'RSI' in processed['LOWERCASE'].columns # Should still add RSI
-
-def test_summarize_last_state(sample_data):
-    analyst = TechnicalAnalyst()
-    processed = analyst.process(sample_data)
-    summary = analyst.summarize_last_state(processed)
-
-    assert "--- TEST_TICKER ---" in summary
-    assert "Price:" in summary
-    assert "RSI (14):" in summary
-    assert "Trend (vs EMA200):" in summary
+    should_run, reason = AnalysisGate.should_trigger_llm("TEST", current_data, mock_snapshot)
+    assert not should_run

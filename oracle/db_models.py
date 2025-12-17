@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS web_users (
     subscription_end_date TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP,
-    FOREIGN KEY (telegram_chat_id) REFERENCES subscribers(chat_id)
+    FOREIGN KEY (telegram_chat_id) REFERENCES subscribers(telegram_chat_id)
 )
 """
 
